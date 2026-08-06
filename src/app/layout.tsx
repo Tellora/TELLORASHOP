@@ -7,6 +7,11 @@ import { ToastProvider } from "@/components/Toast";
 export const metadata: Metadata = {
   title: "TelloraShop — Bold Shopping. Raw Style.",
   description: "Discover unique products with a bold, neo-brutalist shopping experience. Premium quality, raw aesthetics.",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/tellora-logo.png",
+  },
 };
 
 export default function RootLayout({

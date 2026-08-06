@@ -103,8 +103,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               {mobileOpen ? '✕' : '☰ MENU'}
             </button>
 
-            <Link href="/admin" className="navbar-logo" style={{ color: '#FFF' }}>
-              <span className="navbar-logo-box" style={{ background: 'var(--accent-pink)', color: '#FFF', transform: 'rotate(-3deg)' }}>ADM</span>
+            <Link href="/admin" className="navbar-logo" style={{ color: '#FFF', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <img src="/tellora-logo.png" alt="Tellora Logo" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
               Tellora<span style={{ color: 'var(--accent-yellow)' }}>Admin</span>
             </Link>
 

@@ -3,12 +3,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const LogoSVGWhite = () => (
-  <svg viewBox="0 0 120 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="tellora-logo-svg" style={{ height: '40px', width: 'auto' }}>
-    <path d="M15 20 H70 L65 35 H48 L35 75 H18 L28 35 H15 V20 Z" fill="#FFF" />
-    <path d="M48 35 L38 75 H55 L75 20 H58 L48 55 L43 35 H48 Z" fill="#FFF" />
-    <polygon points="72,20 88,20 80,35" fill="#FF1744" />
-    <polygon points="88,20 104,20 96,35" fill="#E5E535" />
-  </svg>
+  <img src="/tellora-logo.png" alt="TelloraShop Logo" style={{ height: '40px', width: 'auto', objectFit: 'contain' }} />
 );
 
 export default function Footer() {
