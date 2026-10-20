@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { hashSync } from 'bcryptjs';
-import { createToken } from '@/lib/auth';
+import { createToken, AuthConfigError } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
+    if (error instanceof AuthConfigError) return NextResponse.json({ error: error.message }, { status: 503 });
     console.error('Register error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

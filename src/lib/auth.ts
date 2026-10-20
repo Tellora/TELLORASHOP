@@ -1,14 +1,42 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { getDataDir, isStoragePersistent } from '@/lib/db';
 
-// In production the secret must come from the environment; the fallback is for local development only.
+export class AuthConfigError extends Error {}
+
+let cachedSecret: Uint8Array | undefined;
+
+/**
+ * Signing key for login sessions.
+ * 1. JWT_SECRET from the environment (recommended).
+ * 2. In production with persistent storage: a random key generated once and saved next to the database.
+ * 3. In production with temporary storage (serverless) there is nowhere safe to keep one, so login is refused
+ *    until JWT_SECRET is set. Browsing the shop keeps working.
+ * Development uses a fixed insecure key.
+ */
 function getSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET;
-  if (!secret && process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET must be set in production');
+  if (cachedSecret) return cachedSecret;
+  const fromEnv = process.env.JWT_SECRET;
+  if (fromEnv) return (cachedSecret = new TextEncoder().encode(fromEnv));
+  if (process.env.NODE_ENV !== 'production') return new TextEncoder().encode('dev-only-insecure-secret-change-me');
+
+  if (!isStoragePersistent()) {
+    throw new AuthConfigError('Login is not configured yet: set the JWT_SECRET environment variable.');
   }
-  return new TextEncoder().encode(secret || 'dev-only-insecure-secret-change-me');
+  const file = path.join(getDataDir(), '.jwt-secret');
+  try {
+    cachedSecret = new TextEncoder().encode(fs.readFileSync(file, 'utf8').trim());
+  } catch {
+    const generated = crypto.randomBytes(48).toString('hex');
+    fs.writeFileSync(file, generated, { mode: 0o600 });
+    console.warn(`JWT_SECRET is not set; generated a signing key at ${file}. Set JWT_SECRET to manage it yourself.`);
+    cachedSecret = new TextEncoder().encode(generated);
+  }
+  return cachedSecret;
 }
 
 const TOKEN_EXPIRY = '7d';

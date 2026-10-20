@@ -6,7 +6,7 @@ import { authHeaders } from '@/lib/admin-client';
 import { AdminHeader, Field } from '@/components/admin/AdminUI';
 
 type Settings = Record<string, string>;
-interface Capabilities { stripe: boolean; stripe_webhook: boolean; email: boolean; site_url: boolean; jwt_secret: boolean }
+interface Capabilities { persistent_storage: boolean; stripe: boolean; stripe_webhook: boolean; email: boolean; site_url: boolean; jwt_secret: boolean }
 
 const card: React.CSSProperties = { background: '#FFF', border: '3.5px solid #000', boxShadow: '5px 5px 0px #000', borderRadius: '12px', padding: '1.5rem' };
 const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' };
@@ -73,6 +73,7 @@ export default function AdminSettingsPage() {
       <div style={{ display: 'grid', gap: '2rem', maxWidth: '900px' }}>
         {caps && (
           <Section title="LAUNCH READINESS">
+            <Check ok={caps.persistent_storage} label="Persistent storage" help="The database must live on a disk that survives restarts (a VPS, or a Docker volume with DB_PATH set). On serverless hosts such as Vercel storage is temporary, so the shop refuses orders until you move it to a persistent host." />
             <Check ok={caps.jwt_secret} label="JWT_SECRET set" help="Required in production so login sessions can't be forged. Set it as an environment variable." />
             <Check ok={caps.site_url} label="NEXT_PUBLIC_SITE_URL set" help="Your public address (https://yourshop.com). Used for emails, the sitemap and payment redirects." />
             <Check ok={caps.email} label="Email provider connected" help="Set RESEND_API_KEY and EMAIL_FROM to send order confirmations, shipping updates and password resets." />

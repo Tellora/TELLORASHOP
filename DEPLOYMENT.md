@@ -16,7 +16,13 @@ To run this app on GitHub, you need to host it on a Node.js-compatible platform 
 
 ---
 
-## 2. Host Option A: Vercel (Easiest & Free)
+## 2. Host Option A: Vercel (browse-only demo, NOT for real orders)
+
+> **Important:** Vercel functions have a read-only disk and temporary storage, so a SQLite database cannot be kept there.
+> The site still loads (it uses a temporary database that is reset whenever the server recycles), but the shop **refuses orders**
+> and the admin panel shows a red warning, because anything saved would disappear. Use it for previews only.
+> For a real store use Option B below, or move the data layer to a hosted database first.
+> On Vercel, also set `JWT_SECRET` (admin login is disabled without it) and optionally `NEXT_PUBLIC_SITE_URL`.
 
 Vercel is the official platform built by the creators of Next.js.
 
@@ -42,6 +48,12 @@ Vercel is the official platform built by the creators of Next.js.
 If you prefer self-hosting with persistent local SQLite (`tellorashop.db`):
 
 ### Step 1: Deploy with Docker
+The image keeps its database in `/data`; mount a volume there so data survives restarts:
+```
+docker run -d -p 3000:3000 -v tellorashop-data:/data \n  -e JWT_SECRET=<long random string> -e NEXT_PUBLIC_SITE_URL=https://shop.example.com tellorashop
+```
+On Render/Railway/Coolify add a persistent disk mounted at `/data`. If you bind-mount a host folder instead of a named volume, make it writable by uid 1001.
+
 1. Push your repository to GitHub.
 2. In **Render**, **Railway**, or your **VPS (e.g. via Portainer / Coolify)**, select **New Web Service** and select `Tellora/TELLORASHOP`.
 3. Choose **Dockerfile** as the build environment (the included `Dockerfile` will automatically build the standalone container).
@@ -92,3 +104,5 @@ The repository includes `.github/workflows/deploy.yml`. Every time you push chan
 5. **Legal pages**: review and edit Privacy Policy, Terms of Service and the other pages in Admin > Pages. The defaults are templates.
 6. **Database persistence**: the app stores everything in `tellorashop.db` (SQLite). It must live on a disk that persists between deploys (a VPS or a Docker volume). Serverless hosts such as Vercel have a read-only, temporary file system and will lose data.
 7. **Back up** `tellorashop.db` regularly.
+
+8. **Continuous integration** (`.github/workflows/deploy.yml`) lints, type-checks, builds, then starts the app and the Docker image and runs `scripts/smoke-test.sh` against them, so a broken deploy fails in CI instead of in production.

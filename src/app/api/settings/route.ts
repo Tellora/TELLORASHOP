@@ -2,30 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { getAllSettings, getPublicSettings, isStripeConfigured } from '@/lib/settings';
+import { isStoragePersistent } from '@/lib/db';
 import { v4 as uuid } from 'uuid';
 
 // Public: only whitelisted storefront settings. Admin (?all=true): everything, plus server capabilities.
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
     const { searchParams } = new URL(request.url);
 
     if (searchParams.get('all') === 'true') {
       const user = await getCurrentUser(request);
       if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       return NextResponse.json({
-        settings: getAllSettings(db),
+        settings: getAllSettings(getDb()),
         capabilities: {
           stripe: isStripeConfigured(),
           stripe_webhook: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
           email: Boolean(process.env.RESEND_API_KEY),
           site_url: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
           jwt_secret: Boolean(process.env.JWT_SECRET),
+          persistent_storage: isStoragePersistent(),
         },
       });
     }
 
-    return NextResponse.json({ settings: getPublicSettings(db) });
+    return NextResponse.json({ settings: getPublicSettings() });
   } catch (error) {
     console.error('Settings GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

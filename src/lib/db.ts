@@ -1,21 +1,66 @@
 import Database from 'better-sqlite3';
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { hashSync } from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
 import { migrate, ensureDefaults } from './schema-extras';
 
-const DB_PATH = path.join(process.cwd(), 'tellorashop.db');
+/**
+ * Where the database lives.
+ * - DB_PATH: explicit location (use a persistent disk or Docker volume in production).
+ * - Serverless hosts (Vercel, AWS Lambda) have a read-only project folder and temporary storage,
+ *   so the database goes in the OS temp folder and is NOT persistent there.
+ * - Otherwise: tellorashop.db in the project folder.
+ */
+function resolveStorage(): { file: string; persistent: boolean } {
+  if (process.env.DB_PATH) return { file: path.resolve(process.env.DB_PATH), persistent: true };
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return { file: path.join(os.tmpdir(), 'tellorashop.db'), persistent: false };
+  }
+  return { file: path.join(process.cwd(), 'tellorashop.db'), persistent: true };
+}
 
-let db: Database.Database;
+let storage = resolveStorage();
+let db: Database.Database | undefined;
+
+function open(file: string): Database.Database {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const conn = new Database(file);
+  conn.pragma('journal_mode = WAL');
+  conn.pragma('foreign_keys = ON');
+  initializeDatabase(conn);
+  return conn;
+}
 
 export function getDb(): Database.Database {
   if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('foreign_keys = ON');
-    initializeDatabase(db);
+    try {
+      db = open(storage.file);
+    } catch (error) {
+      // Never take the whole site down because the disk is read-only: fall back to temporary storage
+      const fallback = path.join(os.tmpdir(), 'tellorashop.db');
+      if (storage.file === fallback) throw error;
+      console.error(`Could not open database at ${storage.file}, using temporary storage instead:`, error);
+      storage = { file: fallback, persistent: false };
+      db = open(fallback);
+    }
   }
   return db;
+}
+
+/** Path of the database file (the folder next to it is also used for generated secrets). */
+export function getDataDir(): string {
+  return path.dirname(storage.file);
+}
+
+/**
+ * False when the database is in temporary storage (serverless hosts). Data written there, including orders,
+ * disappears when the server instance recycles, so the store must not take real orders in that mode.
+ */
+export function isStoragePersistent(): boolean {
+  getDb();
+  return storage.persistent;
 }
 
 function initializeDatabase(db: Database.Database) {

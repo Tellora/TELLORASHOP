@@ -5,11 +5,22 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
+
+# A newer push cancels the older run of the same branch
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: 1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-test:
     name: Build & Verify Application
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -27,33 +38,42 @@ jobs:
       - name: Run Linter
         run: npm run lint
 
+      - name: Type-check
+        run: npx tsc --noEmit
+
       - name: Build Next.js app (standalone)
         run: npm run build
-        env:
-          NEXT_TELEMETRY_DISABLED: 1
 
-  # Deployment job for Vercel (Uncomment and add VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID secrets in GitHub Repo Settings)
-  # deploy-vercel:
-  #   name: Deploy to Vercel
-  #   needs: build-and-test
-  #   runs-on: ubuntu-latest
-  #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
-  #     - name: Deploy to Vercel
-  #       uses: amondnet/vercel-action@v25
-  #       with:
-  #         vercel-token: ${{ secrets.VERCEL_TOKEN }}
-  #         vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-  #         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-  #         vercel-args: '--prod'
+      - name: Prepare standalone server
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
 
-  # Docker Container Build Job (Builds & verifies Docker container)
+      # Serverless hosts such as Vercel have a read-only disk. This run proves the site still serves every
+      # page there (VERCEL=1 switches the app to temporary storage) instead of answering 500.
+      - name: Smoke test (serverless mode)
+        run: |
+          cd .next/standalone
+          VERCEL=1 NODE_ENV=production PORT=3100 HOSTNAME=127.0.0.1 node server.js > /tmp/serverless.log 2>&1 &
+          cd ../..
+          ./scripts/smoke-test.sh http://127.0.0.1:3100 || { cat /tmp/serverless.log; exit 1; }
+          pkill -f "node server.js" || true
+
+      # Normal hosting with a persistent disk (VPS or Docker volume).
+      - name: Smoke test (persistent storage)
+        run: |
+          cd .next/standalone
+          DB_PATH=/tmp/shop-data/tellorashop.db NODE_ENV=production PORT=3101 HOSTNAME=127.0.0.1 node server.js > /tmp/persistent.log 2>&1 &
+          cd ../..
+          ./scripts/smoke-test.sh http://127.0.0.1:3101 || { cat /tmp/persistent.log; exit 1; }
+          pkill -f "node server.js" || true
+
+  # The Docker image is built AND started, then checked with the same smoke test.
   docker-build:
-    name: Build Docker Container
+    name: Build & Test Docker Container
     needs: build-and-test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,4 +86,20 @@ jobs:
         with:
           context: .
           push: false
-          tags: tellorashop:latest
+          load: true
+          tags: tellorashop:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run container and smoke test
+        run: |
+          docker run -d --name shop -p 3000:3000 -v shop-data:/data tellorashop:ci
+          ./scripts/smoke-test.sh http://127.0.0.1:3000 || { docker logs shop; exit 1; }
+
+      - name: Container logs
+        if: failure()
+        run: docker logs shop || true
+
+  # To also deploy from this workflow, connect the repository to your host (Vercel, Render, Railway, ...)
+  # or add a deploy job here that runs after docker-build succeeds. Deploy only from a persistent host:
+  # see DEPLOYMENT.md (the database is a SQLite file and needs a disk that survives restarts).

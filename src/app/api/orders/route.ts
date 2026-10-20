@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, isStoragePersistent } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 import { getAllSettings, num, isStripeConfigured, siteUrl } from '@/lib/settings';
@@ -57,6 +57,11 @@ export async function POST(request: NextRequest) {
   try {
     const limited = rateLimit(request, 'order', 20, 10 * 60 * 1000);
     if (limited) return limited;
+
+    // On temporary storage (serverless hosts) orders would vanish when the server recycles, so refuse them
+    if (!isStoragePersistent() && process.env.ALLOW_EPHEMERAL_ORDERS !== 'true') {
+      return NextResponse.json({ error: 'Ordering is temporarily unavailable. Please check back soon.' }, { status: 503 });
+    }
 
     const user = await getCurrentUser(request);
     const body = await request.json();

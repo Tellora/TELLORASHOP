@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, isStoragePersistent } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { getAllSettings, num } from '@/lib/settings';
 
@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
       reviews_pending: count('SELECT COUNT(*) n FROM reviews WHERE is_approved = 0'),
       messages_new: count("SELECT COUNT(*) n FROM contact_messages WHERE status = 'new'"),
       subscribers: count('SELECT COUNT(*) n FROM newsletter WHERE is_active = 1'),
+      storage_persistent: isStoragePersistent() ? 1 : 0,
       low_stock: count('SELECT COUNT(*) n FROM products WHERE track_inventory = 1 AND is_active = 1 AND quantity <= ?', lowStock),
     });
   } catch (error) {

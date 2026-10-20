@@ -213,6 +213,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Content Panel */}
         <main className="admin-content" style={{ flex: 1, padding: '2rem 2.5rem', background: '#FFFDF9', overflowX: 'auto' }}>
+          {counts.storage_persistent === 0 && (
+            <div role="alert" style={{ background: 'var(--accent-red)', color: '#FFF', border: '3px solid #000', boxShadow: '4px 4px 0px #000', padding: '0.85rem 1.25rem', marginBottom: '1.5rem', fontWeight: 800 }}>
+              TEMPORARY STORAGE: this server does not keep data between restarts, so anything you change here (and any order) can disappear, and checkout is switched off. Host the store on a persistent disk before going live. See Store Settings &gt; Launch Readiness.
+            </div>
+          )}
           {insecurePassword && (
             <div role="alert" style={{ background: 'var(--accent-red)', color: '#FFF', border: '3px solid #000', boxShadow: '4px 4px 0px #000', padding: '0.85rem 1.25rem', marginBottom: '1.5rem', fontWeight: 800 }}>
               SECURITY: this admin account still uses the default password (admin123). Change it now from <Link href="/account" style={{ textDecoration: 'underline' }}>My Account → Security</Link> before going live.
