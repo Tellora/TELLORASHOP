@@ -48,7 +48,6 @@ export default function AdminSettingsPage() {
   }, [token]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (token) load();
   }, [token, load]);
 

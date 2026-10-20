@@ -21,7 +21,6 @@ export default function AdminMessagesPage() {
   }, [token]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (token) load();
   }, [token, load]);
 

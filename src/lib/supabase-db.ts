@@ -10,6 +10,9 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
+/** A row sent to Supabase. */
+type Row = Record<string, unknown>;
+
 export const supabaseDb = {
   // Users
   users: {
@@ -31,7 +34,7 @@ export const supabaseDb = {
       if (error) throw error;
       return data;
     },
-    async create(user: any) {
+    async create(user: Row) {
       const { data, error } = await supabase
         .from('users')
         .insert([user])
@@ -48,7 +51,7 @@ export const supabaseDb = {
       if (error) throw error;
       return data || [];
     },
-    async update(id: string, updates: any) {
+    async update(id: string, updates: Row) {
       const { data, error } = await supabase
         .from('users')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -79,7 +82,7 @@ export const supabaseDb = {
       if (error) throw error;
       return data;
     },
-    async create(category: any) {
+    async create(category: Row) {
       const { data, error } = await supabase
         .from('categories')
         .insert([category])
@@ -88,7 +91,7 @@ export const supabaseDb = {
       if (error) throw error;
       return data;
     },
-    async update(id: string, updates: any) {
+    async update(id: string, updates: Row) {
       const { data, error } = await supabase
         .from('categories')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -146,7 +149,7 @@ export const supabaseDb = {
       if (error) throw error;
       return data;
     },
-    async create(product: any) {
+    async create(product: Row) {
       const { data, error } = await supabase
         .from('products')
         .insert([product])
@@ -155,7 +158,7 @@ export const supabaseDb = {
       if (error) throw error;
       return data;
     },
-    async update(id: string, updates: any) {
+    async update(id: string, updates: Row) {
       const { data, error } = await supabase
         .from('products')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -203,7 +206,7 @@ export const supabaseDb = {
       if (error) throw error;
       return data;
     },
-    async create(order: any, items: any[]) {
+    async create(order: Row, items: Row[]) {
       const { data: createdOrder, error: orderErr } = await supabase
         .from('orders')
         .insert([order])
@@ -224,7 +227,7 @@ export const supabaseDb = {
       return createdOrder;
     },
     async updateStatus(id: string, status: string, trackingNumber?: string) {
-      const updates: any = { status, updated_at: new Date().toISOString() };
+      const updates: Row = { status, updated_at: new Date().toISOString() };
       if (trackingNumber !== undefined) updates.tracking_number = trackingNumber;
       
       const { data, error } = await supabase

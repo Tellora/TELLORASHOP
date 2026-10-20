@@ -23,7 +23,6 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token || !user) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIds(new Set());
       return;
     }

@@ -55,7 +55,6 @@ function CheckoutContent() {
   useEffect(() => {
     if (!user) return;
     const [first, ...rest] = (user.name || '').split(' ');
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShipping(s => ({ ...s, email: s.email || user.email, firstName: s.firstName || first || '', lastName: s.lastName || rest.join(' ') }));
   }, [user]);
 

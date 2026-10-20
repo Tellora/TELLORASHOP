@@ -26,7 +26,6 @@ export default function RecentlyViewed({ excludeId, title = 'RECENTLY VIEWED' }:
   const [items, setItems] = useState<Viewed[]>([]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setItems(read().filter(p => p.id !== excludeId).slice(0, 4));
   }, [excludeId]);
 

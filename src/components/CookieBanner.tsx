@@ -13,7 +13,6 @@ export default function CookieBanner({ analyticsId }: { analyticsId: string }) {
   const [choice, setChoice] = useState<'accepted' | 'declined' | null | undefined>(undefined);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setChoice((localStorage.getItem(KEY) as 'accepted' | 'declined' | null) || null);
   }, []);
 
