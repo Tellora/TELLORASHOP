@@ -1,12 +1,16 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSettings } from '@/context/SettingsContext';
+import { brandParts } from '@/lib/brand';
 
 const LogoSVGWhite = () => (
   <img src="/tellora-logo.png" alt="TelloraShop Logo" style={{ height: '40px', width: 'auto', objectFit: 'contain' }} />
 );
 
 export default function Footer() {
+  const settings = useSettings();
+  const [brandA, brandB] = brandParts(settings.storeName);
   const [email, setEmail] = useState('');
   const [subMsg, setSubMsg] = useState('');
   const [showScroll, setShowScroll] = useState(false);
@@ -94,17 +98,25 @@ export default function Footer() {
                   <LogoSVGWhite />
                 </div>
                 <span className="font-brutal-title" style={{ fontSize: '1.6rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
-                  TELLORA<span style={{ color: 'var(--accent-purple)' }}>SHOP</span>
+                  {brandA.toUpperCase()}<span style={{ color: 'var(--accent-purple)' }}>{brandB.toUpperCase()}</span>
                 </span>
               </div>
               <p className="footer-desc" style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                Bold shopping. Raw style. We curate products that refuse to blend in — just like you.
+                {settings.tagline || 'Quality products, delivered.'}
               </p>
+              {(settings.email || settings.phone || settings.address) && (
+                <address style={{ fontStyle: 'normal', color: '#aaa', fontSize: '0.85rem', lineHeight: 1.7, marginBottom: '1.25rem', fontWeight: 600 }}>
+                  {settings.email && <div><a href={`mailto:${settings.email}`} style={{ color: '#ccc' }}>{settings.email}</a></div>}
+                  {settings.phone && <div><a href={`tel:${settings.phone.replace(/[^+\d]/g, '')}`} style={{ color: '#ccc' }}>{settings.phone}</a></div>}
+                  {settings.address && <div style={{ whiteSpace: 'pre-line' }}>{settings.address}</div>}
+                </address>
+              )}
               <div className="footer-socials" style={{ display: 'flex', gap: '0.5rem' }}>
-                <a href="#" className="footer-social" style={{ borderColor: '#333' }}>𝕏</a>
-                <a href="#" className="footer-social" style={{ borderColor: '#333' }}>IG</a>
-                <a href="#" className="footer-social" style={{ borderColor: '#333' }}>LN</a>
-                <a href="#" className="footer-social" style={{ borderColor: '#333' }}>YT</a>
+                {([['x', '𝕏', 'X'], ['instagram', 'IG', 'Instagram'], ['facebook', 'FB', 'Facebook'], ['youtube', 'YT', 'YouTube']] as const).map(([key, label, name]) =>
+                  settings.social[key] ? (
+                    <a key={key} href={settings.social[key]} target="_blank" rel="noopener noreferrer" aria-label={name} className="footer-social" style={{ borderColor: '#333' }}>{label}</a>
+                  ) : null
+                )}
               </div>
             </div>
 
@@ -125,9 +137,13 @@ export default function Footer() {
               <h4 className="footer-heading" style={{ color: 'var(--accent-purple)', marginBottom: '1.25rem' }}>HELP</h4>
               <ul className="footer-links" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', listStyle: 'none', padding: 0 }}>
                 <li><Link href="/page/about" style={{ color: '#ccc', fontWeight: 700, fontSize: '0.85rem' }}>ABOUT US</Link></li>
-                <li><Link href="/page/contact" style={{ color: '#ccc', fontWeight: 700, fontSize: '0.85rem' }}>CONTACT</Link></li>
+                <li><Link href="/contact" style={{ color: '#ccc', fontWeight: 700, fontSize: '0.85rem' }}>CONTACT</Link></li>
                 <li><Link href="/page/shipping-policy" style={{ color: '#ccc', fontWeight: 700, fontSize: '0.85rem' }}>SHIPPING POLICY</Link></li>
                 <li><Link href="/page/return-policy" style={{ color: '#ccc', fontWeight: 700, fontSize: '0.85rem' }}>RETURN POLICY</Link></li>
+                <li><Link href="/page/privacy-policy" style={{ color: '#ccc', fontWeight: 700, fontSize: '0.85rem' }}>PRIVACY POLICY</Link></li>
+                <li><Link href="/page/terms-of-service" style={{ color: '#ccc', fontWeight: 700, fontSize: '0.85rem' }}>TERMS OF SERVICE</Link></li>
+                <li><Link href="/faq" style={{ color: '#ccc', fontWeight: 700, fontSize: '0.85rem' }}>FAQ</Link></li>
+                <li><Link href="/track-order" style={{ color: '#ccc', fontWeight: 700, fontSize: '0.85rem' }}>TRACK ORDER</Link></li>
               </ul>
             </div>
 
@@ -149,19 +165,12 @@ export default function Footer() {
           {/* Footer bottom bar */}
           <div className="footer-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <span style={{ fontSize: '0.8rem', color: '#888', fontWeight: 700 }}>
-              © 2026 TELLORASHOP. ALL RIGHTS RESERVED. PART OF TELLORA MEDIA NETWORKS.
+              © {new Date().getFullYear()} {settings.storeName.toUpperCase()}. ALL RIGHTS RESERVED.
             </span>
-            <div style={{
-              background: '#222',
-              border: '2px solid #fff',
-              padding: '0.25rem 0.75rem',
-              transform: 'rotate(-1deg)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              color: '#fff'
-            }}>
-              VIBE CHECK: PASSED
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }} aria-label="Accepted payment methods">
+              {['VISA', 'MASTERCARD', 'AMEX', 'PAYPAL'].map(p => (
+                <span key={p} style={{ background: '#222', border: '2px solid #fff', padding: '0.2rem 0.6rem', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', fontWeight: 800, color: '#fff' }}>{p}</span>
+              ))}
             </div>
           </div>
         </div>
@@ -170,14 +179,6 @@ export default function Footer() {
       {/* Floating CORE INTEL Widget (Screenshot 1 bottom right) */}
       {showScroll && (
         <div className="floating-core-intel">
-          <div className="core-intel-panel">
-            <span className="core-intel-status-dot" />
-            <span>CORE INTEL</span>
-            <span style={{ color: '#666' }}>|</span>
-            <span style={{ color: 'var(--accent-yellow)' }}>PHASE: 04</span>
-            <span style={{ color: '#666' }}>|</span>
-            <span style={{ color: 'var(--accent-green)' }}>READY TO SCALP</span>
-          </div>
           <button className="scroll-top-btn" onClick={scrollToTop} title="Scroll to Top">
             ↑
           </button>

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
+import { downloadExport } from '@/lib/admin-client';
 
 interface Product {
   id: string;
@@ -21,6 +22,18 @@ interface Product {
   weight: number;
   tags: string;
   images: string;
+  track_inventory?: number;
+  seo_title?: string;
+  seo_description?: string;
+}
+
+/** Stored as a JSON array; show it one URL per line in the editor. */
+function imagesToText(raw?: string): string {
+  try {
+    let v: unknown = raw;
+    for (let i = 0; i < 3 && typeof v === 'string'; i++) v = JSON.parse(v);
+    return Array.isArray(v) ? v.join('\n') : '';
+  } catch { return ''; }
 }
 
 interface Category {
@@ -56,7 +69,10 @@ export default function AdminProductsPage() {
     is_featured: false,
     weight: '',
     tags: '',
-    images: '[]',
+    images: '',
+    track_inventory: true,
+    seo_title: '',
+    seo_description: '',
   });
 
   const fetchProducts = React.useCallback(async () => {
@@ -68,7 +84,7 @@ export default function AdminProductsPage() {
       if (search) params.set('search', search);
       if (categoryFilter) params.set('category', categoryFilter);
       
-      const res = await fetch(`/api/products?${params.toString()}`);
+      const res = await fetch(`/api/products?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         setProducts(data.products || []);
@@ -77,7 +93,7 @@ export default function AdminProductsPage() {
       showToast('Error loading products', 'error');
     }
     setLoading(false);
-  }, [search, categoryFilter, showToast]);
+  }, [search, categoryFilter, showToast, token]);
 
   const fetchCategories = React.useCallback(async () => {
     try {
@@ -112,7 +128,10 @@ export default function AdminProductsPage() {
       is_featured: p.is_featured === 1,
       weight: String(p.weight || ''),
       tags: p.tags || '',
-      images: p.images || '[]',
+      images: imagesToText(p.images),
+      track_inventory: p.track_inventory !== 0,
+      seo_title: p.seo_title || '',
+      seo_description: p.seo_description || '',
     });
     setIsModalOpen(true);
   };
@@ -134,7 +153,10 @@ export default function AdminProductsPage() {
       is_featured: false,
       weight: '',
       tags: '',
-      images: '[]',
+      images: '',
+      track_inventory: true,
+      seo_title: '',
+      seo_description: '',
     });
     setIsModalOpen(true);
   };
@@ -153,6 +175,7 @@ export default function AdminProductsPage() {
       cost: form.cost ? parseFloat(form.cost) : null,
       quantity: parseInt(form.quantity),
       weight: form.weight ? parseFloat(form.weight) : null,
+      images: form.images.split(/\n+/).map(s => s.trim()).filter(Boolean),
     };
 
     try {
@@ -201,6 +224,8 @@ export default function AdminProductsPage() {
   const filteredProducts = products.filter(p => {
     if (activeFilter === 'active' && p.is_active !== 1) return false;
     if (activeFilter === 'inactive' && p.is_active !== 0) return false;
+    if (activeFilter === 'out' && !(p.track_inventory !== 0 && p.quantity <= 0)) return false;
+    if (activeFilter === 'low' && !(p.track_inventory !== 0 && p.quantity > 0 && p.quantity <= 5)) return false;
     return true;
   });
 
@@ -253,6 +278,9 @@ export default function AdminProductsPage() {
             Manage pricing, cost margins, inventory stock meters, and product listings.
           </p>
         </div>
+        <button onClick={async () => { if (!(await downloadExport('products', token))) showToast('Export failed', 'error'); }} className="btn btn-lg" style={{ boxShadow: '4px 4px 0px #000', marginRight: '0.75rem' }}>
+          EXPORT CSV
+        </button>
         <button onClick={handleAddNewClick} className="btn btn-primary btn-lg" style={{ boxShadow: '4px 4px 0px #000' }}>
           + ADD NEW PRODUCT
         </button>
@@ -291,6 +319,8 @@ export default function AdminProductsPage() {
           <option value="">ALL STATUSES</option>
           <option value="active">ACTIVE ONLY</option>
           <option value="inactive">DRAFT ONLY</option>
+          <option value="low">LOW STOCK (≤5)</option>
+          <option value="out">OUT OF STOCK</option>
         </select>
       </div>
 
@@ -429,8 +459,21 @@ export default function AdminProductsPage() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div className="input-group">
-                    <label>Image URL (Unsplash or CDN Link)</label>
-                    <input className="input" placeholder="https://images.unsplash.com/..." value={form.images.startsWith('[') ? (JSON.parse(form.images || '[]')[0] || '') : form.images} onChange={e => setForm(p => ({ ...p, images: JSON.stringify([e.target.value]) }))} />
+                    <label>Image URLs (one per line, first is the main image)</label>
+                    <textarea className="input" rows={3} placeholder={'https://cdn.example.com/photo-1.jpg\nhttps://cdn.example.com/photo-2.jpg'} value={form.images} onChange={e => setForm(p => ({ ...p, images: e.target.value }))} />
+                  </div>
+                  <div className="input-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input type="checkbox" checked={form.track_inventory} onChange={e => setForm(p => ({ ...p, track_inventory: e.target.checked }))} /> Track inventory (untick for unlimited stock)
+                    </label>
+                  </div>
+                  <div className="input-group">
+                    <label>SEO title (optional)</label>
+                    <input className="input" value={form.seo_title} onChange={e => setForm(p => ({ ...p, seo_title: e.target.value }))} placeholder="Shown in Google results" />
+                  </div>
+                  <div className="input-group">
+                    <label>SEO description (optional)</label>
+                    <textarea className="input" rows={2} value={form.seo_description} onChange={e => setForm(p => ({ ...p, seo_description: e.target.value }))} />
                   </div>
                   <div className="input-group">
                     <label>Short Summary</label>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { normalizeImages } from '@/lib/images';
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +12,7 @@ export async function GET(
     const db = getDb();
 
     // Try to find by slug first, then by id
-    let product = db.prepare(`
+    const product = db.prepare(`
       SELECT p.*, c.name as category_name, c.slug as category_slug,
       (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id AND r.is_approved = 1) as avg_rating,
       (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id AND r.is_approved = 1) as review_count
@@ -20,9 +21,14 @@ export async function GET(
       WHERE p.slug = ? OR p.id = ?
     `).get(id, id) as Record<string, unknown> | undefined;
 
-    if (!product) {
+    const viewer = await getCurrentUser(request);
+    const isAdmin = viewer?.role === 'admin';
+    // Draft products are hidden from the public
+    if (!product || (!product.is_active && !isAdmin)) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
+    // Wholesale cost is for admins only
+    const hideCost = <T extends Record<string, unknown>>(p: T): T => { if (isAdmin) return p; const { cost: _cost, ...rest } = p; void _cost; return rest as T; };
 
     // Get reviews
     const reviews = db.prepare(`
@@ -45,7 +51,7 @@ export async function GET(
       LIMIT 4
     `).all(product.category_id as string, product.id as string);
 
-    return NextResponse.json({ product, reviews, variants, related });
+    return NextResponse.json({ product: hideCost(product), reviews, variants, related: (related as Array<Record<string, unknown>>).map(hideCost) });
   } catch (error) {
     console.error('Product GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -80,7 +86,7 @@ export async function PUT(
       if (body[field] !== undefined) {
         fields.push(`${field} = ?`);
         if (field === 'images') {
-          values.push(JSON.stringify(body[field]));
+          values.push(JSON.stringify(normalizeImages(body[field])));
         } else if (['is_active', 'is_featured', 'track_inventory'].includes(field)) {
           values.push(body[field] ? 1 : 0);
         } else {

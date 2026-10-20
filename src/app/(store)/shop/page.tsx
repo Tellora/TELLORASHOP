@@ -28,6 +28,9 @@ function ShopContent() {
   const minPrice = searchParams.get('minPrice') || '';
   const maxPrice = searchParams.get('maxPrice') || '';
   const featured = searchParams.get('featured') || '';
+  const inStock = searchParams.get('inStock') || '';
+  const onSale = searchParams.get('onSale') || '';
+  const minRating = searchParams.get('minRating') || '';
 
   const [localMinPrice, setLocalMinPrice] = useState(minPrice);
   const [localMaxPrice, setLocalMaxPrice] = useState(maxPrice);
@@ -43,6 +46,9 @@ function ShopContent() {
     if (minPrice) params.set('minPrice', minPrice);
     if (maxPrice) params.set('maxPrice', maxPrice);
     if (featured) params.set('featured', featured);
+    if (inStock) params.set('inStock', inStock);
+    if (onSale) params.set('onSale', onSale);
+    if (minRating) params.set('minRating', minRating);
 
     try {
       const res = await fetch(`/api/products?${params.toString()}`);
@@ -51,7 +57,7 @@ function ShopContent() {
       setPagination(data.pagination || { page: 1, totalPages: 1, total: 0 });
     } catch { /* ignore */ }
     setLoading(false);
-  }, [page, category, sort, search, minPrice, maxPrice, featured]);
+  }, [page, category, sort, search, minPrice, maxPrice, featured, inStock, onSale, minRating]);
 
   useEffect(() => {
     fetch('/api/categories').then(r => r.json()).then(d => setCategories(d.categories || []));
@@ -91,10 +97,10 @@ function ShopContent() {
         </div>
       </div>
 
-      <div className="container" style={{ padding: '2.5rem 0 5rem' }}>
+      <div className="container" style={{ paddingTop: '2.5rem', paddingBottom: '5rem' }}>
         
         {/* Active Filter Chips */}
-        {(category || search || minPrice || maxPrice || featured) && (
+        {(category || search || minPrice || maxPrice || featured || inStock || onSale || minRating) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem', background: '#FFF', padding: '1rem', border: '3px solid #000', borderRadius: '8px', boxShadow: '3px 3px 0px #000' }}>
             <span style={{ fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase' }}>ACTIVE FILTERS:</span>
             {category && (
@@ -117,6 +123,9 @@ function ShopContent() {
                 FEATURED ONLY ✕
               </span>
             )}
+            {inStock && <span className="badge badge-green" style={{ cursor: 'pointer' }} onClick={() => updateFilter('inStock', '')}>IN STOCK ✕</span>}
+            {onSale && <span className="badge badge-red" style={{ cursor: 'pointer' }} onClick={() => updateFilter('onSale', '')}>ON SALE ✕</span>}
+            {minRating && <span className="badge badge-yellow" style={{ cursor: 'pointer' }} onClick={() => updateFilter('minRating', '')}>{minRating}★ &amp; UP ✕</span>}
             <button className="btn btn-sm btn-danger" onClick={() => router.push('/shop')} style={{ marginLeft: 'auto', padding: '0.2rem 0.6rem' }}>
               CLEAR ALL
             </button>
@@ -162,6 +171,18 @@ function ShopContent() {
                 <label className="filter-option" onClick={() => updateFilter('featured', featured ? '' : 'true')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}>
                   <input type="checkbox" checked={!!featured} readOnly /> Featured Only
                 </label>
+                <label className="filter-option" onClick={() => updateFilter('inStock', inStock ? '' : 'true')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, marginTop: '0.6rem' }}>
+                  <input type="checkbox" checked={!!inStock} readOnly /> In Stock Only
+                </label>
+                <label className="filter-option" onClick={() => updateFilter('onSale', onSale ? '' : 'true')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, marginTop: '0.6rem' }}>
+                  <input type="checkbox" checked={!!onSale} readOnly /> On Sale
+                </label>
+                <div style={{ marginTop: '0.9rem', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Customer rating</div>
+                {['4', '3'].map(r => (
+                  <label key={r} className="filter-option" onClick={() => updateFilter('minRating', minRating === r ? '' : r)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, marginTop: '0.6rem' }}>
+                    <input type="radio" name="rating" checked={minRating === r} readOnly /> {r}★ &amp; up
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -181,6 +202,7 @@ function ShopContent() {
                 <label style={{ fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>SORT BY:</label>
                 <select className="input" value={sort} onChange={e => updateFilter('sort', e.target.value)} style={{ padding: '0.4rem 2rem 0.4rem 0.8rem', fontSize: '0.8rem', width: 'auto', boxShadow: 'none' }}>
                   <option value="newest">Newest Arrivals</option>
+                  <option value="rating">Best Rated</option>
                   <option value="oldest">Oldest First</option>
                   <option value="price_asc">Price: Low → High</option>
                   <option value="price_desc">Price: High → Low</option>

@@ -6,6 +6,10 @@ import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
 import ProductCard from '@/components/ProductCard';
+import RecentlyViewed, { trackRecentlyViewed } from '@/components/RecentlyViewed';
+import { useWishlist } from '@/context/WishlistContext';
+import { useSettings } from '@/context/SettingsContext';
+import { useRouter } from 'next/navigation';
 
 interface Product {
   id: string; name: string; slug: string; description: string; short_description: string;
@@ -24,10 +28,14 @@ export default function ProductPage() {
   const { addItem } = useCart();
   const { user, token } = useAuth();
   const { showToast } = useToast();
+  const router = useRouter();
+  const settings = useSettings();
+  const { has: inWishlist, toggle: toggleWish } = useWishlist();
   const [product, setProduct] = useState<Product | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [related, setRelated] = useState<Product[]>([]);
   const [quantity, setQuantity] = useState(1);
+  const [activeImage, setActiveImage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('description');
   const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', comment: '' });
@@ -37,6 +45,7 @@ export default function ProductPage() {
       .then(r => r.json())
       .then(data => {
         setProduct(data.product);
+        if (data.product) trackRecentlyViewed(data.product);
         setReviews(data.reviews || []);
         setRelated(data.related || []);
         setLoading(false);
@@ -67,6 +76,38 @@ export default function ProductPage() {
     } catch { showToast('Error submitting review', 'error'); }
   };
 
+  const handleBuyNow = () => {
+    if (!product) return;
+    addItem({ product_id: product.id, name: product.name, price: product.price, compare_at_price: product.compare_at_price, quantity, slug: product.slug });
+    router.push('/checkout');
+  };
+
+  const handleWishlist = async () => {
+    if (!product) return;
+    const result = await toggleWish(product.id);
+    if (result === 'login') showToast('Log in to save items to your wishlist', 'info');
+    else if (result === 'added') showToast('Added to wishlist!');
+    else if (result === 'removed') showToast('Removed from wishlist');
+    else showToast('Could not update wishlist', 'error');
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) { await navigator.share({ title: product?.name, url }); return; }
+      await navigator.clipboard.writeText(url);
+      showToast('Link copied!');
+    } catch { /* user cancelled */ }
+  };
+
+  const deliveryRange = () => {
+    const fmt = (d: Date) => d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const from = new Date(); const [minDays, maxDays] = (settings.deliveryDays.match(/\d+/g) || ['3', '5']).map(Number);
+    from.setDate(from.getDate() + minDays);
+    const to = new Date(); to.setDate(to.getDate() + (maxDays ?? minDays));
+    return `${fmt(from)} – ${fmt(to)}`;
+  };
+
   const renderStars = (r: number) => Array.from({ length: 5 }, (_, i) => i < Math.round(r) ? '★' : '☆').join('');
 
   if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
@@ -89,25 +130,27 @@ export default function ProductPage() {
     'wireless-charging-pad': 'https://images.unsplash.com/photo-1622445268465-840246e904b6?auto=format&fit=crop&w=1000&q=80',
   };
 
-  const getProductImage = () => {
+  const getProductImages = (): string[] => {
     try {
       if (product.images) {
         const parsed = JSON.parse(product.images);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]) {
-          return parsed[0];
+        if (Array.isArray(parsed)) {
+          const list = parsed.filter((x: unknown) => typeof x === 'string' && x);
+          if (list.length) return list as string[];
         }
       }
     } catch {
       /* ignore */
     }
-    return fallbackImages[product.slug] || null;
+    return fallbackImages[product.slug] ? [fallbackImages[product.slug]] : [];
   };
 
-  const mainImage = getProductImage();
+  const gallery = getProductImages();
+  const mainImage = gallery[Math.min(activeImage, Math.max(0, gallery.length - 1))] || null;
 
   return (
-    <div className="container" style={{ padding: '2.5rem 0 5rem' }}>
-      <div className="product-detail" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: '3rem', marginBottom: '4rem' }}>
+    <div className="container" style={{ paddingTop: '2.5rem', paddingBottom: '5rem' }}>
+      <div className="product-detail" style={{ padding: 0, marginBottom: '2rem' }}>
         {/* GALLERY */}
         <div className="product-gallery">
           <div className="product-gallery-main" style={{
@@ -134,6 +177,16 @@ export default function ProductPage() {
               {discount > 0 && <span className="badge badge-red" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>SAVE {discount}%</span>}
             </div>
           </div>
+          {gallery.length > 1 && (
+            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+              {gallery.map((src, i) => (
+                <button key={src + i} onClick={() => setActiveImage(i)} aria-label={`Show image ${i + 1}`} style={{ width: '72px', height: '72px', padding: 0, border: i === activeImage ? '4px solid #000' : '3px solid #999', borderRadius: '8px', overflow: 'hidden', background: '#FFF', boxShadow: i === activeImage ? '3px 3px 0 #000' : 'none' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* INFO */}
@@ -155,7 +208,7 @@ export default function ProductPage() {
             </span>
           </div>
 
-          <div className="product-info-price" style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '1.5rem', background: 'var(--accent-yellow)', padding: '1rem 1.5rem', border: '3px solid #000', boxShadow: '4px 4px 0px #000', borderRadius: '12px' }}>
+          <div className="product-info-price" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '1rem', marginBottom: '1.5rem', background: 'var(--accent-yellow)', padding: '1rem 1.5rem', border: '3px solid #000', boxShadow: '4px 4px 0px #000', borderRadius: '12px' }}>
             <span className="product-info-price-current" style={{ fontSize: '2.5rem', fontWeight: 900, fontFamily: 'var(--font-mono)' }}>
               ${product.price.toFixed(2)}
             </span>
@@ -194,11 +247,33 @@ export default function ProductPage() {
             <div className="product-qty-selector" style={{ display: 'flex', alignItems: 'center', border: '3px solid #000', borderRadius: '8px', background: '#FFF', boxShadow: '3px 3px 0px #000' }}>
               <button className="product-qty-btn" onClick={() => setQuantity(Math.max(1, quantity - 1))} style={{ padding: '0.75rem 1.25rem', fontSize: '1.2rem', fontWeight: 900, background: 'none', border: 'none', cursor: 'pointer' }}>−</button>
               <div className="product-qty-value" style={{ fontFamily: 'var(--font-mono)', fontWeight: 900, fontSize: '1.1rem', minWidth: '40px', textAlign: 'center' }}>{quantity}</div>
-              <button className="product-qty-btn" onClick={() => setQuantity(quantity + 1)} style={{ padding: '0.75rem 1.25rem', fontSize: '1.2rem', fontWeight: 900, background: 'none', border: 'none', cursor: 'pointer' }}>+</button>
+              <button className="product-qty-btn" onClick={() => setQuantity(Math.min(Math.max(1, product.quantity), quantity + 1))} style={{ padding: '0.75rem 1.25rem', fontSize: '1.2rem', fontWeight: 900, background: 'none', border: 'none', cursor: 'pointer' }}>+</button>
             </div>
             <button className="btn btn-primary btn-lg" onClick={handleAddToCart} disabled={product.quantity <= 0} style={{ flex: 1, boxShadow: '4px 4px 0px #000' }}>
               {product.quantity <= 0 ? 'OUT OF STOCK' : 'ADD TO CART →'}
             </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+            <button className="btn btn-sm" onClick={handleBuyNow} disabled={product.quantity <= 0} style={{ border: '2.5px solid #000', boxShadow: '3px 3px 0px #000' }}>BUY NOW</button>
+            <button className="btn btn-sm" onClick={handleWishlist} style={{ border: '2.5px solid #000', boxShadow: '3px 3px 0px #000', background: inWishlist(product.id) ? 'var(--accent-red)' : '#FFF', color: inWishlist(product.id) ? '#FFF' : '#000' }}>
+              {inWishlist(product.id) ? '♥ SAVED' : '♡ WISHLIST'}
+            </button>
+            <button className="btn btn-sm" onClick={handleShare} style={{ border: '2.5px solid #000', boxShadow: '3px 3px 0px #000' }}>SHARE ↗</button>
+          </div>
+
+          {/* Delivery & trust */}
+          <div style={{ border: '2.5px solid #000', borderRadius: '8px', background: '#FFF', boxShadow: '3px 3px 0px #000', padding: '1rem 1.25rem', display: 'grid', gap: '0.6rem', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1.5rem' }}>
+            <div>🚚 <strong>Estimated delivery:</strong> {deliveryRange()}</div>
+            {settings.freeShippingThreshold > 0 && <div>📦 Free shipping on orders over {settings.symbol}{settings.freeShippingThreshold}</div>}
+            {settings.returnDays > 0 && <div>↩️ {settings.returnDays}-day hassle-free returns</div>}
+            <div>🔒 Secure checkout</div>
+          </div>
+
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', fontWeight: 700, color: '#555', display: 'grid', gap: '0.2rem' }}>
+            {product.sku && <span>SKU: {product.sku}</span>}
+            {product.category_name && <span>CATEGORY: {product.category_name.toUpperCase()}</span>}
+            {product.weight ? <span>WEIGHT: {product.weight} KG</span> : null}
           </div>
 
           {product.tags && (
@@ -271,6 +346,8 @@ export default function ProductPage() {
           </div>
         )}
       </div>
+
+      <RecentlyViewed excludeId={product.id} />
 
       {/* RELATED PRODUCTS */}
       {related.length > 0 && (

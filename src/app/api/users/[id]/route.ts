@@ -49,7 +49,11 @@ export async function PUT(
         values.push(field === 'is_active' ? (body[field] ? 1 : 0) : body[field]);
       }
     }
-    if (body.password) {
+    if (authUser.role === 'admin' && authUser.userId === id && (body.role === 'customer' || body.is_active === false || body.is_active === 0)) {
+      return NextResponse.json({ error: 'You cannot demote or deactivate your own admin account' }, { status: 400 });
+    }
+    if (body.password && authUser.role === 'admin') {
+      if (String(body.password).length < 8) return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
       fields.push('password_hash = ?');
       values.push(hashSync(body.password, 10));
     }

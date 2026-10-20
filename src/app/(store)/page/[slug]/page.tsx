@@ -1,54 +1,32 @@
-'use client';
-import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { getDb } from '@/lib/db';
 
-interface CMSPage {
-  title: string;
-  content: string;
-  is_published: number;
+export const dynamic = 'force-dynamic';
+
+interface CMSPage { title: string; content: string }
+
+function loadPage(slug: string): CMSPage | undefined {
+  return getDb().prepare('SELECT title, content FROM pages WHERE slug = ? AND is_published = 1').get(slug) as CMSPage | undefined;
 }
 
-export default function StaticCMSPage() {
-  const { slug } = useParams();
-  const router = useRouter();
-  const [page, setPage] = useState<CMSPage | null>(null);
-  const [loading, setLoading] = useState(true);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const page = loadPage(slug);
+  if (!page) return { title: 'Page not found', robots: { index: false } };
+  const text = page.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return { title: page.title, description: text.slice(0, 160) };
+}
 
-  useEffect(() => {
-    fetch(`/api/pages/${slug}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.page && data.page.is_published === 1) {
-          setPage(data.page);
-        } else {
-          setPage(null);
-        }
-        setLoading(false);
-      })
-      .catch(() => {
-        setPage(null);
-        setLoading(false);
-      });
-  }, [slug]);
-
-  if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
-
-  if (!page) {
-    return (
-      <div className="container section">
-        <div className="empty-state">
-          <div className="empty-state-icon" style={{ fontFamily: 'var(--font-mono)', fontWeight: 900, fontSize: '2rem', color: '#ccc' }}>404</div>
-          <h3>Page not found</h3>
-          <p>The page you are looking for does not exist or has been unpublished.</p>
-          <Link href="/" className="btn btn-primary mt-2">BACK TO HOME</Link>
-        </div>
-      </div>
-    );
-  }
+// Content is written by store admins in the CMS, so it is rendered as trusted HTML.
+export default async function StaticCMSPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const page = loadPage(slug);
+  if (!page) notFound();
 
   return (
-    <div className="container" style={{ padding: '3.5rem 0 6rem', maxWidth: '850px' }}>
+    <div className="container" style={{ paddingTop: '3.5rem', paddingBottom: '6rem', maxWidth: '850px' }}>
       <div className="brutal-badge-slanted brutal-badge-purple" style={{ marginBottom: '1.25rem', transform: 'rotate(-2deg)' }}>
         INFORMATION & POLICIES
       </div>
@@ -61,7 +39,7 @@ export default function StaticCMSPage() {
           style={{ lineHeight: 1.8, fontSize: '1.05rem', fontWeight: 500 }}
           dangerouslySetInnerHTML={{ __html: page.content }}
         />
-        <div style={{ marginTop: '3rem', borderTop: '3px solid #000', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ marginTop: '3rem', borderTop: '3px solid #000', paddingTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
           <Link href="/" className="btn btn-sm btn-dark" style={{ boxShadow: '2px 2px 0px #000' }}>← BACK TO HOME</Link>
           <Link href="/shop" className="btn btn-sm btn-primary" style={{ boxShadow: '2px 2px 0px #000' }}>EXPLORE SHOP →</Link>
         </div>

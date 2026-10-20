@@ -2,12 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ProductCard from '@/components/ProductCard';
+import RecentlyViewed from '@/components/RecentlyViewed';
+import { useSettings } from '@/context/SettingsContext';
 
 interface Product {
   id: string; name: string; slug: string; price: number; compare_at_price: number;
   images: string; category_name: string; category_slug: string; avg_rating: number;
   review_count: number; is_featured: number; quantity: number;
 }
+
+interface Banner { id: string; title: string; subtitle: string; image: string | null; link: string; button_text: string }
 
 interface Category {
   id: string; name: string; slug: string; description: string; product_count: number;
@@ -33,6 +37,9 @@ const categoryIcons: Record<string, string> = {
 };
 
 export default function HomePage() {
+  const { freeShippingThreshold, symbol, returnDays, storeName, tagline } = useSettings();
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [bannerIndex, setBannerIndex] = useState(0);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [newProducts, setNewProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -43,13 +50,24 @@ export default function HomePage() {
       fetch('/api/products?featured=true&limit=8').then(r => r.json()),
       fetch('/api/products?sort=newest&limit=4').then(r => r.json()),
       fetch('/api/categories').then(r => r.json()),
-    ]).then(([feat, newest, cats]) => {
+      fetch('/api/banners').then(r => r.json()).catch(() => ({ banners: [] })),
+    ]).then(([feat, newest, cats, bn]) => {
+      setBanners(bn.banners || []);
       setFeaturedProducts(feat.products || []);
       setNewProducts(newest.products || []);
       setCategories(cats.categories || []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  // Rotate the hero when more than one banner is active
+  useEffect(() => {
+    if (banners.length < 2) return;
+    const t = setInterval(() => setBannerIndex(i => (i + 1) % banners.length), 6000);
+    return () => clearInterval(t);
+  }, [banners.length]);
+
+  const banner = banners.length ? banners[bannerIndex % banners.length] : null;
 
   if (loading) {
     return <div className="loading-spinner"><div className="spinner" /></div>;
@@ -58,25 +76,32 @@ export default function HomePage() {
   return (
     <>
       {/* SECTION 1: HERO (Brutalist style matching Screenshot 1 colors & buttons) */}
-      <section className="hero" style={{ background: 'var(--accent-yellow)', padding: '6rem 0', overflow: 'hidden', borderBottom: '3px solid #000' }}>
+      <section className="hero" style={{ background: banner?.image ? `linear-gradient(rgba(229,229,53,0.82), rgba(229,229,53,0.82)), url(${banner.image}) center/cover` : 'var(--accent-yellow)', padding: '6rem 0', overflow: 'hidden', borderBottom: '3px solid #000' }}>
         <div className="container" style={{ position: 'relative', zIndex: 2 }}>
           <div className="brutal-badge-slanted brutal-badge-purple" style={{ marginBottom: '1.5rem', transform: 'rotate(-2deg)' }}>
-            SUMMER COLLECTION 2026
+            {storeName.toUpperCase()}
           </div>
           <h1 style={{ fontSize: 'clamp(3rem, 7.5vw, 5.8rem)', lineHeight: '0.9', margin: '0 0 2rem 0', fontStyle: 'italic', fontWeight: 900, textTransform: 'uppercase', WebkitTextStroke: '1px #000' }}>
-            BOLD SHOPPING.<br />RAW STYLE.
+            {banner ? banner.title : (tagline || storeName)}
           </h1>
           <p className="hero-subtitle" style={{ maxWidth: '550px', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '2.5rem', lineHeight: '1.4' }}>
-            We curate products that refuse to blend in. Premium quality meets unapologetic design.
+            {banner ? banner.subtitle : 'Discover our latest products, curated for quality and style.'}
           </p>
           <div className="hero-actions" style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-            <Link href="/shop" className="btn btn-dark btn-lg" style={{ boxShadow: '4px 4px 0px #000' }}>
-              SHOP NOW →
+            <Link href={banner?.link || '/shop'} className="btn btn-dark btn-lg" style={{ boxShadow: '4px 4px 0px #000' }}>
+              {banner?.button_text ? `${banner.button_text} →` : 'SHOP NOW →'}
             </Link>
             <Link href="/shop?featured=true" className="btn btn-lg" style={{ background: '#fff', color: '#000', boxShadow: '4px 4px 0px #000' }}>
               FEATURED
             </Link>
           </div>
+          {banners.length > 1 && (
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.75rem' }} role="tablist" aria-label="Promotions">
+              {banners.map((b, i) => (
+                <button key={b.id} role="tab" aria-selected={i === bannerIndex % banners.length} aria-label={`Show ${b.title}`} onClick={() => setBannerIndex(i)} style={{ width: '14px', height: '14px', borderRadius: '50%', border: '2px solid #000', background: i === bannerIndex % banners.length ? '#000' : '#FFF', padding: 0 }} />
+              ))}
+            </div>
+          )}
         </div>
         
         {/* Background slanted shapes from reference UI style */}
@@ -89,11 +114,11 @@ export default function HomePage() {
 
       {/* SECTION 2: GUARANTEES BAR */}
       <div className="features-bar" style={{ background: '#000', color: '#fff', borderBottom: '3px solid #000' }}>
-        <div className="container features-bar-inner" style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', padding: '0.5rem 0' }}>
-          <div className="feature-item" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 700 }}><span className="feature-icon">//</span> FREE SHIPPING $75+</div>
-          <div className="feature-item" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 700 }}><span className="feature-icon">//</span> 30-DAY RETURNS</div>
-          <div className="feature-item" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 700 }}><span className="feature-icon">//</span> SECURE CHECKOUT</div>
-          <div className="feature-item" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 700 }}><span className="feature-icon">//</span> 24/7 SUPPORT</div>
+        <div className="container features-bar-inner" style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
+          <div className="feature-item" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 700 }}><span className="feature-icon">{'//'}</span> {freeShippingThreshold > 0 ? `FREE SHIPPING ${symbol}${freeShippingThreshold}+` : 'FAST SHIPPING'}</div>
+          <div className="feature-item" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 700 }}><span className="feature-icon">{'//'}</span> {returnDays}-DAY RETURNS</div>
+          <div className="feature-item" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 700 }}><span className="feature-icon">{'//'}</span> SECURE CHECKOUT</div>
+          <div className="feature-item" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 700 }}><span className="feature-icon">{'//'}</span> 24/7 SUPPORT</div>
         </div>
       </div>
 
@@ -113,12 +138,8 @@ export default function HomePage() {
             
             <div style={{ maxWidth: '400px' }}>
               <p style={{ fontWeight: 700, color: '#333', fontSize: '0.95rem', lineHeight: '1.4', marginBottom: '1.25rem' }}>
-                WE DON'T DO BORING. WE DO HIGH-IMPACT, CUSTOM-MADE SHIPPED UTILITIES DESIGNED TO LAST.
+                WE DON&apos;T DO BORING. WE DO HIGH-IMPACT, CUSTOM-MADE SHIPPED UTILITIES DESIGNED TO LAST.
               </p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button className="btn" style={{ borderRadius: '50%', width: '42px', height: '42px', padding: 0, border: '3px solid #000', boxShadow: '3px 3px 0px #000' }}>←</button>
-                <button className="btn" style={{ borderRadius: '50%', width: '42px', height: '42px', padding: 0, border: '3px solid #000', boxShadow: '3px 3px 0px #000', background: 'var(--accent-yellow)' }}>→</button>
-              </div>
             </div>
           </div>
 
@@ -144,15 +165,21 @@ export default function HomePage() {
                 >
                   {/* Icon Circle Container */}
                   <div style={{
-                    width: '50px',
-                    height: '50px',
+                    minWidth: '64px',
+                    alignSelf: 'flex-start',
+                    height: '44px',
+                    padding: '0 0.6rem',
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 900,
+                    letterSpacing: '0.05em',
+                    color: theme.iconBg === '#000' ? '#FFF' : '#000',
                     borderRadius: '8px',
                     border: '3px solid #000',
                     background: theme.iconBg,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '1.75rem',
+                    fontSize: '0.85rem',
                     marginBottom: '1.75rem',
                     boxShadow: '2px 2px 0px #000'
                   }}>
@@ -305,6 +332,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* RECENTLY VIEWED (only renders when the visitor has history) */}
+      <div className="container"><RecentlyViewed /></div>
+
       {/* SECTION 7: WHY CHOOSE US */}
       <section className="section" style={{ background: 'var(--bg-dark)', color: 'var(--text-on-dark)' }}>
         <div className="container">
@@ -315,8 +345,8 @@ export default function HomePage() {
             {[
               { icon: '01', title: 'Curated Selection', desc: 'Every product is hand-picked for quality and uniqueness. No generic stuff.' },
               { icon: '02', title: 'Premium Quality', desc: 'We partner with the best brands and artisans for products that last.' },
-              { icon: '03', title: 'Fast & Free Shipping', desc: 'Free shipping on orders over $75. Express delivery available.' },
-              { icon: '04', title: 'Easy Returns', desc: '30-day hassle-free returns. No questions asked.' },
+              { icon: '03', title: 'Fast & Free Shipping', desc: freeShippingThreshold > 0 ? `Free shipping on orders over ${symbol}${freeShippingThreshold}. Express delivery available.` : 'Fast, tracked delivery. Express available.' },
+              { icon: '04', title: 'Easy Returns', desc: `${returnDays}-day hassle-free returns. No questions asked.` },
             ].map((item, i) => (
               <div key={i} className="card" style={{ padding: '2rem', border: '3px solid #333', background: '#111', color: '#fff', borderRadius: '12px' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{item.icon}</div>

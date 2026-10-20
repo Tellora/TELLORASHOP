@@ -100,7 +100,7 @@ export default function AdminOrderDetailPage() {
         showToast('Order details updated!');
         fetchOrder();
       } else {
-        showToast('Failed to update order', 'error');
+        showToast((await res.json().catch(() => ({}))).error || 'Failed to update order', 'error');
       }
     } catch {
       showToast('Network error', 'error');

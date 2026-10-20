@@ -8,20 +8,21 @@ const accountLinks = [
   { href: '/account', label: 'Profile', icon: 'USR' },
   { href: '/account/orders', label: 'My Orders', icon: 'ORD' },
   { href: '/account/wishlist', label: 'Wishlist', icon: 'FAV' },
+  { href: '/account/addresses', label: 'Addresses', icon: 'ADR' },
 ];
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!loading) {
-      if (!user) { router.push('/login'); }
+      if (!user) { router.push(`/login?redirect=${encodeURIComponent(pathname)}`); }
       else { setReady(true); }
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, pathname]);
 
   if (!ready) return <div className="loading-spinner"><div className="spinner" /></div>;
 
@@ -38,6 +39,9 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
               <span>{link.icon}</span> {link.label}
             </Link>
           ))}
+          <button className="account-nav-link" onClick={async () => { await logout(); router.push('/'); }} style={{ background: 'none', border: 'none', textAlign: 'left', width: '100%' }}>
+            <span>OUT</span> Log out
+          </button>
         </nav>
         <div>{children}</div>
       </div>

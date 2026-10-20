@@ -43,16 +43,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
+  const [hydrated, setHydrated] = useState(false);
+
+  // Restore the saved cart once on the client (localStorage doesn't exist during SSR)
   useEffect(() => {
     const saved = localStorage.getItem('cart');
     if (saved) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       try { setItems(JSON.parse(saved)); } catch { /* ignore */ }
     }
+    setHydrated(true);
   }, []);
 
+  // Only persist after restoring, otherwise the initial empty cart overwrites the saved one
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(items));
-  }, [items]);
+    if (hydrated) localStorage.setItem('cart', JSON.stringify(items));
+  }, [items, hydrated]);
 
   const addItem = (item: CartItem) => {
     setItems(prev => {

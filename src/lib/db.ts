@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { hashSync } from 'bcryptjs';
+import { v4 as uuid } from 'uuid';
+import { migrate, ensureDefaults } from './schema-extras';
 
 const DB_PATH = path.join(process.cwd(), 'tellorashop.db');
 
@@ -211,15 +213,18 @@ function initializeDatabase(db: Database.Database) {
     );
   `);
 
+  migrate(db);
+
   // Seed default admin if not exists
   const adminExists = db.prepare('SELECT id FROM users WHERE role = ?').get('admin');
   if (!adminExists) {
     seedDatabase(db);
   }
+
+  ensureDefaults(db);
 }
 
 function seedDatabase(db: Database.Database) {
-  const { v4: uuid } = require('uuid');
 
   // Create admin user
   const adminId = uuid();

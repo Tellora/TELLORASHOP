@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useCart } from '@/context/CartContext';
+import { useToast } from '@/components/Toast';
 
 interface OrderDetail { id: string; order_number: string; status: string; total: number; subtotal: number; tax: number; shipping_cost: number; discount: number; created_at: string; payment_status: string; payment_method: string; tracking_number: string; shipping_address: string; }
 interface OrderItem { id: string; name: string; price: number; quantity: number; total: number; product_id: string; }
@@ -10,6 +12,8 @@ interface OrderItem { id: string; name: string; price: number; quantity: number;
 export default function OrderDetailPage() {
   const { id } = useParams();
   const { token } = useAuth();
+  const { addItem } = useCart();
+  const { showToast } = useToast();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +25,28 @@ export default function OrderDetailPage() {
       .then(d => { setOrder(d.order); setItems(d.items || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, [id, token]);
+
+  const cancelOrder = async () => {
+    if (!order || !window.confirm('Cancel this order?')) return;
+    const res = await fetch(`/api/orders/${order.id}/cancel`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) { showToast(data.message || 'Order cancelled'); setOrder({ ...order, status: 'cancelled' }); } else showToast(data.error || 'Could not cancel order', 'error');
+  };
+
+  const reorder = async () => {
+    let added = 0;
+    for (const item of items) {
+      try {
+        const r = await fetch(`/api/products/${item.product_id}`);
+        if (!r.ok) continue;
+        const p = (await r.json()).product;
+        if (!p || !p.is_active || (p.track_inventory && p.quantity < 1)) continue;
+        addItem({ product_id: p.id, name: p.name, price: p.price, compare_at_price: p.compare_at_price, quantity: Math.min(item.quantity, p.track_inventory ? p.quantity : item.quantity), slug: p.slug });
+        added++;
+      } catch { /* skip unavailable item */ }
+    }
+    showToast(added ? `Added ${added} item${added > 1 ? 's' : ''} to your cart` : 'Those items are no longer available', added ? 'success' : 'error');
+  };
 
   if (loading) return <div className="loading-spinner"><div className="spinner" /></div>;
   if (!order) return <div className="empty-state"><h3>Order not found</h3></div>;
@@ -71,7 +97,12 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <Link href="/account/orders" className="btn mt-2">← BACK TO ORDERS</Link>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1.5rem' }}>
+        <Link href="/account/orders" className="btn">← BACK TO ORDERS</Link>
+        <button className="btn btn-primary" onClick={reorder}>BUY AGAIN</button>
+        {['pending', 'confirmed', 'processing'].includes(order.status) && <button className="btn btn-danger" onClick={cancelOrder}>CANCEL ORDER</button>}
+        <Link href="/contact" className="btn">NEED HELP?</Link>
+      </div>
     </div>
   );
 }

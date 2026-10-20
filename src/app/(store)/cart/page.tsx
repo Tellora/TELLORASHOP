@@ -2,6 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
+import { useSettings } from '@/context/SettingsContext';
 
 const fallbackImages: Record<string, string> = {
   'wireless-nc-headphones': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80',
@@ -20,13 +21,14 @@ const fallbackImages: Record<string, string> = {
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal } = useCart();
-  const shipping = subtotal >= 75 ? 0 : 9.99;
-  const tax = subtotal * 0.085;
+  const { freeShippingThreshold, shippingFlat, taxRate, symbol } = useSettings();
+  const shipping = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold ? 0 : shippingFlat;
+  const tax = subtotal * (taxRate / 100);
   const total = subtotal + shipping + tax;
 
   if (items.length === 0) {
     return (
-      <div className="container section" style={{ padding: '4rem 0' }}>
+      <div className="container section" style={{ paddingTop: '4rem', paddingBottom: '4rem' }}>
         <div className="empty-state card" style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center', padding: '3.5rem 2rem', border: '3.5px solid #000', boxShadow: '6px 6px 0px #000', borderRadius: '16px' }}>
           <div className="empty-state-icon" style={{ fontFamily: 'var(--font-mono)', fontWeight: 900, fontSize: '3rem', color: '#CCC', marginBottom: '1rem' }}>EMPTY CART</div>
           <h3 style={{ fontSize: '1.75rem', fontStyle: 'italic', marginBottom: '0.75rem' }}>YOUR CART IS CURRENTLY EMPTY</h3>
@@ -38,7 +40,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="container" style={{ padding: '3rem 0 5rem' }}>
+    <div className="container" style={{ paddingTop: '3rem', paddingBottom: '5rem' }}>
       <div className="brutal-badge-slanted brutal-badge-yellow" style={{ marginBottom: '1rem' }}>
         SHOPPING BAG
       </div>
@@ -46,9 +48,9 @@ export default function CartPage() {
         YOUR <span style={{ color: 'var(--accent-purple)' }}>CART</span>
       </h1>
 
-      <div className="checkout-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '2.5rem' }}>
+      <div className="checkout-layout" style={{ padding: 0 }}>
         <div>
-          <div className="admin-table-wrapper" style={{ border: '3.5px solid #000', borderRadius: '12px', boxShadow: '5px 5px 0px #000', background: '#FFF', overflow: 'hidden' }}>
+          <div className="admin-table-wrapper" style={{ border: '3.5px solid #000', borderRadius: '12px', boxShadow: '5px 5px 0px #000', background: '#FFF', overflowX: 'auto' }}>
             <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--bg-secondary)', borderBottom: '3px solid #000' }}>
@@ -108,16 +110,16 @@ export default function CartPage() {
               <span style={{ fontFamily: 'var(--font-mono)' }}>{shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}</span>
             </div>
             <div className="checkout-summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem', fontWeight: 700 }}>
-              <span>Est. Tax (8.5%)</span>
+              <span>Est. Tax ({taxRate}%)</span>
               <span style={{ fontFamily: 'var(--font-mono)' }}>${tax.toFixed(2)}</span>
             </div>
             <div className="checkout-summary-row checkout-summary-total" style={{ display: 'flex', justifyContent: 'space-between', borderTop: '3px solid #000', paddingTop: '1.25rem', marginBottom: '1.5rem', fontWeight: 900, fontSize: '1.2rem' }}>
               <span>ESTIMATED TOTAL</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1.6rem', color: '#000' }}>${total.toFixed(2)}</span>
             </div>
-            {subtotal < 75 ? (
+            {freeShippingThreshold <= 0 ? null : subtotal < freeShippingThreshold ? (
               <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#444', marginBottom: '1.5rem', fontFamily: 'var(--font-mono)', background: '#FFF', padding: '0.65rem', border: '2px solid #000', borderRadius: '6px' }}>
-                Add <strong>${(75 - subtotal).toFixed(2)}</strong> more to qualify for FREE shipping!
+                Add <strong>{symbol}{(freeShippingThreshold - subtotal).toFixed(2)}</strong> more to qualify for FREE shipping!
               </p>
             ) : (
               <p style={{ fontSize: '0.8rem', fontWeight: 800, color: 'green', marginBottom: '1.5rem', fontFamily: 'var(--font-mono)', background: '#FFF', padding: '0.65rem', border: '2px solid #000', borderRadius: '6px' }}>

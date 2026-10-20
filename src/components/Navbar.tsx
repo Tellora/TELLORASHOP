@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
+import { useSettings } from '@/context/SettingsContext';
+import { brandParts } from '@/lib/brand';
 
 const LogoSVG = () => (
   <img src="/tellora-logo.png" alt="TelloraShop Logo" style={{ height: '36px', width: 'auto', objectFit: 'contain' }} />
@@ -12,6 +15,9 @@ const LogoSVG = () => (
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
   const { totalItems, toggleCart } = useCart();
+  const { count: wishlistCount } = useWishlist();
+  const { storeName, announcements } = useSettings();
+  const [brandA, brandB] = brandParts(storeName);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,25 +77,20 @@ export default function Navbar() {
   return (
     <>
       {/* Top Announcement Bar */}
-      <div className="marquee">
-        <div className="marquee-inner">
-          {[1, 2].map(i => (
-            <React.Fragment key={i}>
-              <span className="marquee-item">TELLORASHOP 2026 OUT NOW</span>
-              <span className="marquee-item">FREE SHIPPING ON ORDERS OVER $75</span>
-              <span className="marquee-item">PREMIUM RAW QUALITY</span>
-              <span className="marquee-item">CODE WELCOME10 FOR 10% OFF</span>
-              <span className="marquee-item">TELLORASHOP 2026 OUT NOW</span>
-              <span className="marquee-item">FREE SHIPPING ON ORDERS OVER $75</span>
-              <span className="marquee-item">PREMIUM RAW QUALITY</span>
-              <span className="marquee-item">CODE WELCOME10 FOR 10% OFF</span>
-            </React.Fragment>
-          ))}
+      {announcements.length > 0 && (
+        <div className="marquee">
+          <div className="marquee-inner">
+            {[1, 2, 3, 4].map(i => (
+              <React.Fragment key={i}>
+                {announcements.map((text, j) => <span key={j} className="marquee-item">{text}</span>)}
+              </React.Fragment>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <header style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--bg-primary)', borderBottom: '3px solid #000', padding: '0.75rem 0' }}>
-        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', position: 'relative' }}>
+        <div className="container navbar-inner">
           
           {/* Logo Section */}
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -107,12 +108,12 @@ export default function Navbar() {
               <LogoSVG />
             </div>
             <span className="font-brutal-title" style={{ fontSize: '1.4rem', fontWeight: 900, color: '#000', letterSpacing: '-0.02em' }}>
-              TELLORA<span style={{ color: 'var(--accent-purple)' }}>SHOP</span>
+              {brandA.toUpperCase()}<span style={{ color: 'var(--accent-purple)' }}>{brandB.toUpperCase()}</span>
             </span>
           </Link>
 
           {/* Navigation Pill (Desktop) */}
-          <nav className="navbar-links brutal-header-pill" style={{ display: 'flex' }}>
+          <nav className="navbar-links brutal-header-pill">
             <Link href="/" className={`navbar-link ${isActive('/')}`}>HOME</Link>
             <Link href="/shop" className={`navbar-link ${pathname === '/shop' ? 'active' : ''}`}>SHOP</Link>
             <Link href="/shop?category=electronics" className="navbar-link">ELECTRONICS</Link>
@@ -120,93 +121,97 @@ export default function Navbar() {
             <Link href="/page/about" className={`navbar-link ${isActive('/page/about')}`}>ABOUT</Link>
           </nav>
 
-          {/* Actions (Search, Account, Cart, Mobile Menu) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            
-            {/* Styled Autocomplete Search */}
-            <div className="search-bar" ref={searchRef} style={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              border: '3px solid #000',
-              borderRadius: '8px',
+        {/* Styled Autocomplete Search */}
+        <div className="search-bar" ref={searchRef} style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          border: '3px solid #000',
+          borderRadius: '8px',
+          background: '#fff',
+          padding: '0.4rem 0.8rem',
+          boxShadow: '3px 3px 0px #000',
+          transition: 'all 0.2s ease'
+        }}>
+          <svg style={{ marginRight: '0.4rem', width: '14px', height: '14px', flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            type="text"
+            placeholder="SEARCH..."
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+            onFocus={() => setSearchOpen(true)}
+            style={{
+              border: 'none',
+              outline: 'none',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              width: '100%',
+              textTransform: 'uppercase'
+            }}
+          />
+          {searchOpen && (searchResults.products.length > 0 || searchResults.categories.length > 0) && (
+            <div className="search-results" style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              minWidth: '260px',
               background: '#fff',
-              padding: '0.4rem 0.8rem',
-              boxShadow: '3px 3px 0px #000',
-              width: '200px',
-              transition: 'all 0.2s ease'
+              border: '3px solid #000',
+              boxShadow: '5px 5px 0px #000',
+              zIndex: 200,
+              marginTop: '0.5rem',
+              borderRadius: '8px',
+              maxHeight: '320px',
+              overflowY: 'auto'
             }}>
-              <svg style={{ marginRight: '0.4rem', width: '14px', height: '14px', flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input
-                type="text"
-                placeholder="SEARCH..."
-                value={searchQuery}
-                onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-                onFocus={() => setSearchOpen(true)}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  width: '100%',
-                  textTransform: 'uppercase'
-                }}
-              />
-              {searchOpen && (searchResults.products.length > 0 || searchResults.categories.length > 0) && (
-                <div className="search-results" style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  minWidth: '260px',
-                  background: '#fff',
-                  border: '3px solid #000',
-                  boxShadow: '5px 5px 0px #000',
-                  zIndex: 200,
-                  marginTop: '0.5rem',
-                  borderRadius: '8px',
-                  maxHeight: '320px',
-                  overflowY: 'auto'
-                }}>
-                  {searchResults.categories.map(cat => (
-                    <div
-                      key={cat.id}
-                      className="search-result-item"
-                      onClick={() => { router.push(`/shop?category=${cat.slug}`); setSearchOpen(false); setSearchQuery(''); }}
-                      style={{ padding: '0.75rem', borderBottom: '2px solid #000', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                    >
-                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 900, fontSize: '0.7rem', background: 'var(--accent-yellow)', padding: '0.15rem 0.4rem', border: '2px solid #000', borderRadius: '4px' }}>CAT</span>
-                      <div>
-                        <strong style={{ fontSize: '0.85rem' }}>{cat.name.toUpperCase()}</strong>
-                        <br />
-                        <small style={{ color: '#888' }}>CATEGORY</small>
-                      </div>
-                    </div>
-                  ))}
-                  {searchResults.products.map(product => {
-                    const imgUrl = getFirstImage(product.images);
-                    return (
-                      <div
-                        key={product.id}
-                        className="search-result-item"
-                        onClick={() => { router.push(`/product/${product.slug}`); setSearchOpen(false); setSearchQuery(''); }}
-                        style={{ padding: '0.65rem 0.75rem', borderBottom: '2px solid #000', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem' }}
-                      >
-                        {imgUrl ? (
-                          <img src={imgUrl} alt={product.name} style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '4px', border: '2px solid #000' }} />
-                        ) : (
-                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 900, fontSize: '0.65rem', background: 'var(--accent-green)', padding: '0.2rem 0.4rem', border: '2px solid #000', borderRadius: '4px' }}>PRD</span>
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 800, fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name.toUpperCase()}</div>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-purple)' }}>${product.price.toFixed(2)}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
+              {searchResults.categories.map(cat => (
+                <div
+                  key={cat.id}
+                  className="search-result-item"
+                  onClick={() => { router.push(`/shop?category=${cat.slug}`); setSearchOpen(false); setSearchQuery(''); }}
+                  style={{ padding: '0.75rem', borderBottom: '2px solid #000', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 900, fontSize: '0.7rem', background: 'var(--accent-yellow)', padding: '0.15rem 0.4rem', border: '2px solid #000', borderRadius: '4px' }}>CAT</span>
+                  <div>
+                    <strong style={{ fontSize: '0.85rem' }}>{cat.name.toUpperCase()}</strong>
+                    <br />
+                    <small style={{ color: '#888' }}>CATEGORY</small>
+                  </div>
                 </div>
-              )}
+              ))}
+              {searchResults.products.map(product => {
+                const imgUrl = getFirstImage(product.images);
+                return (
+                  <div
+                    key={product.id}
+                    className="search-result-item"
+                    onClick={() => { router.push(`/product/${product.slug}`); setSearchOpen(false); setSearchQuery(''); }}
+                    style={{ padding: '0.65rem 0.75rem', borderBottom: '2px solid #000', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem' }}
+                  >
+                    {imgUrl ? (
+                      <img src={imgUrl} alt={product.name} style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '4px', border: '2px solid #000' }} />
+                    ) : (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 900, fontSize: '0.65rem', background: 'var(--accent-green)', padding: '0.2rem 0.4rem', border: '2px solid #000', borderRadius: '4px' }}>PRD</span>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name.toUpperCase()}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-purple)' }}>${product.price.toFixed(2)}</div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          )}
+        </div>
+
+          {/* Actions (Search, Account, Cart, Mobile Menu) */}
+          <div className="navbar-actions">
+            {/* Wishlist */}
+            <Link href={user ? '/account/wishlist' : '/login'} className="navbar-icon-btn navbar-wishlist navbar-hide-mobile" style={{ borderRadius: '8px', border: '3px solid #000', position: 'relative' }} title="Wishlist" aria-label="Wishlist">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              {wishlistCount > 0 && <span className="navbar-badge">{wishlistCount}</span>}
+            </Link>
 
             {/* Profile Action */}
             {user ? (
@@ -240,7 +245,7 @@ export default function Navbar() {
             {/* Shop Now Action Button (Styled Yellow FREE AUDIT-style Button) */}
             <Link
               href="/shop"
-              className="btn btn-primary d-desktop-only"
+              className="btn btn-primary navbar-shop-now"
               style={{
                 borderRadius: '8px',
                 padding: '0.5rem 1rem',
@@ -257,7 +262,7 @@ export default function Navbar() {
 
             {/* Logout Trigger (If Logged In) */}
             {user && (
-              <button className="navbar-icon-btn" style={{ borderRadius: '8px', border: '3px solid #000' }} onClick={logout} title="Logout">
+              <button className="navbar-icon-btn navbar-hide-mobile" style={{ borderRadius: '8px', border: '3px solid #000' }} onClick={logout} title="Logout">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               </button>
             )}
@@ -266,8 +271,8 @@ export default function Navbar() {
             <button
               className="mobile-menu-btn"
               onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Menu"
               style={{
-                display: 'none',
                 width: '42px',
                 height: '42px',
                 background: 'var(--accent-yellow)',
@@ -306,6 +311,10 @@ export default function Navbar() {
             <Link href="/shop?category=electronics" className="btn btn-full" onClick={() => setMobileOpen(false)}>ELECTRONICS</Link>
             <Link href="/shop?category=clothing" className="btn btn-full" onClick={() => setMobileOpen(false)}>CLOTHING</Link>
             <Link href="/page/about" className="btn btn-full" onClick={() => setMobileOpen(false)}>ABOUT</Link>
+            <Link href={user ? '/account/wishlist' : '/login'} className="btn btn-full" onClick={() => setMobileOpen(false)}>WISHLIST{wishlistCount > 0 ? ` (${wishlistCount})` : ''}</Link>
+            <Link href="/track-order" className="btn btn-full" onClick={() => setMobileOpen(false)}>TRACK ORDER</Link>
+            <Link href="/faq" className="btn btn-full" onClick={() => setMobileOpen(false)}>FAQ</Link>
+            {user && <button className="btn btn-full btn-danger" onClick={() => { setMobileOpen(false); logout(); }}>LOGOUT</button>}
           </div>
         )}
       </header>

@@ -2,21 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
+import { normalizeImages } from '@/lib/images';
 
 export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const { searchParams } = new URL(request.url);
 
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '12');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '12') || 12));
     const category = searchParams.get('category');
     const search = searchParams.get('search');
     const sort = searchParams.get('sort') || 'newest';
     const featured = searchParams.get('featured');
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
-    const isAdmin = searchParams.get('admin') === 'true';
+    let isAdmin = false;
+    if (searchParams.get('admin') === 'true') {
+      const viewer = await getCurrentUser(request);
+      if (!viewer || viewer.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      isAdmin = true;
+    }
+    const inStock = searchParams.get('inStock') === 'true';
+    const onSale = searchParams.get('onSale') === 'true';
+    const minRating = parseFloat(searchParams.get('minRating') || '');
 
     let where = isAdmin ? '1=1' : 'p.is_active = 1';
     const params: (string | number)[] = [];
@@ -46,12 +55,26 @@ export async function GET(request: NextRequest) {
       params.push(parseFloat(maxPrice));
     }
 
+    if (inStock) {
+      where += ' AND (p.track_inventory = 0 OR p.quantity > 0)';
+    }
+
+    if (onSale) {
+      where += ' AND p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price';
+    }
+
+    if (Number.isFinite(minRating) && minRating > 0) {
+      where += ' AND (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id AND r.is_approved = 1) >= ?';
+      params.push(minRating);
+    }
+
     let orderBy = 'p.created_at DESC';
     switch (sort) {
       case 'price_asc': orderBy = 'p.price ASC'; break;
       case 'price_desc': orderBy = 'p.price DESC'; break;
       case 'name_asc': orderBy = 'p.name ASC'; break;
       case 'name_desc': orderBy = 'p.name DESC'; break;
+      case 'rating': orderBy = '(SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id AND r.is_approved = 1) DESC, p.created_at DESC'; break;
       case 'oldest': orderBy = 'p.created_at ASC'; break;
       default: orderBy = 'p.created_at DESC';
     }
@@ -64,7 +87,7 @@ export async function GET(request: NextRequest) {
       WHERE ${where}
     `).get(...params) as { total: number };
 
-    const products = db.prepare(`
+    const rows = db.prepare(`
       SELECT p.*, c.name as category_name, c.slug as category_slug,
       (SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = p.id AND r.is_approved = 1) as avg_rating,
       (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id AND r.is_approved = 1) as review_count
@@ -73,7 +96,9 @@ export async function GET(request: NextRequest) {
       WHERE ${where}
       ORDER BY ${orderBy}
       LIMIT ? OFFSET ?
-    `).all(...params, limit, offset);
+    `).all(...params, limit, offset) as Array<Record<string, unknown>>;
+    // Wholesale cost is for admins only
+    const products = isAdmin ? rows : rows.map(r => { const { cost: _cost, ...rest } = r; void _cost; return rest; });
 
     return NextResponse.json({
       products,
@@ -121,7 +146,7 @@ export async function POST(request: NextRequest) {
       quantity || 0, track_inventory !== undefined ? (track_inventory ? 1 : 0) : 1,
       category_id || null, is_active !== undefined ? (is_active ? 1 : 0) : 1,
       is_featured ? 1 : 0, weight || null,
-      JSON.stringify(images || []), tags || '', seo_title || '', seo_description || ''
+      JSON.stringify(normalizeImages(images)), tags || '', seo_title || '', seo_description || ''
     );
 
     const product = db.prepare('SELECT * FROM products WHERE id = ?').get(id);

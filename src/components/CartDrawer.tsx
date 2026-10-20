@@ -2,6 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
+import { useSettings } from '@/context/SettingsContext';
 
 const fallbackImages: Record<string, string> = {
   'wireless-nc-headphones': 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=400&q=80',
@@ -21,8 +22,8 @@ const fallbackImages: Record<string, string> = {
 export default function CartDrawer() {
   const { items, removeItem, updateQuantity, subtotal, totalItems, isOpen, closeCart } = useCart();
 
-  const freeShippingThreshold = 75;
-  const progressPercent = Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100));
+  const { freeShippingThreshold, symbol } = useSettings();
+  const progressPercent = Math.min(100, Math.round((subtotal / (freeShippingThreshold || 1)) * 100));
   const remainingForFreeShipping = freeShippingThreshold - subtotal;
 
   return (
@@ -34,8 +35,8 @@ export default function CartDrawer() {
           <button className="btn btn-sm" onClick={closeCart} style={{ border: '2.5px solid #000', borderRadius: '50%', width: '36px', height: '36px', padding: 0 }}>✕</button>
         </div>
 
-        {/* Free Shipping Progress Meter */}
-        <div style={{ background: '#FFFDF9', borderBottom: '2.5px solid #000', padding: '0.85rem 1.5rem' }}>
+        {/* Free Shipping Progress Meter (hidden when the store has no free-shipping threshold) */}
+        {freeShippingThreshold > 0 && <div style={{ background: '#FFFDF9', borderBottom: '2.5px solid #000', padding: '0.85rem 1.5rem' }}>
           {subtotal >= freeShippingThreshold ? (
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', fontWeight: 800, color: '#000', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span className="badge badge-green" style={{ transform: 'none', padding: '0.15rem 0.4rem' }}>UNLOCKED</span>
@@ -44,14 +45,14 @@ export default function CartDrawer() {
           ) : (
             <div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.4rem', color: '#333' }}>
-                Add <strong style={{ color: 'var(--accent-purple)' }}>${remainingForFreeShipping.toFixed(2)}</strong> more for <strong>FREE SHIPPING</strong>
+                Add <strong style={{ color: 'var(--accent-purple)' }}>{symbol}{remainingForFreeShipping.toFixed(2)}</strong> more for <strong>FREE SHIPPING</strong>
               </div>
               <div style={{ height: '10px', background: '#EEE', border: '2px solid #000', borderRadius: '6px', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${progressPercent}%`, background: 'var(--accent-yellow)', transition: 'width 0.3s ease' }} />
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         <div className="cart-body" style={{ padding: '1.25rem' }}>
           {items.length === 0 ? (

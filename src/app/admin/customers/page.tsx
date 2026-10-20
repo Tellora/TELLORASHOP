@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
+import { downloadExport } from '@/lib/admin-client';
 
 interface Customer {
   id: string;
@@ -21,12 +22,15 @@ export default function AdminCustomersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
+  const [roleView, setRoleView] = useState<'customer' | 'admin'>('customer');
+
   const fetchCustomers = React.useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
-      params.set('role', 'customer');
+      params.set('role', roleView);
+      params.set('limit', '200');
       
       const res = await fetch(`/api/users?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -39,7 +43,7 @@ export default function AdminCustomersPage() {
       showToast('Error loading customers', 'error');
     }
     setLoading(false);
-  }, [token, search, showToast]);
+  }, [token, search, roleView, showToast]);
 
   useEffect(() => {
     if (token) fetchCustomers();
@@ -62,6 +66,17 @@ export default function AdminCustomersPage() {
     } catch {
       showToast('Error updating customer', 'error');
     }
+  };
+
+  const handleRole = async (id: string, name: string, role: 'admin' | 'customer') => {
+    if (!window.confirm(role === 'admin' ? `Give ${name} full admin access?` : `Remove admin access from ${name}?`)) return;
+    const res = await fetch(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ role }) });
+    if (res.ok) { showToast('Role updated'); fetchCustomers(); } else showToast((await res.json().catch(() => ({}))).error || 'Could not update role', 'error');
+  };
+
+  const handleReset = async (email: string) => {
+    const res = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+    showToast(res.ok ? `Password reset email sent to ${email} (if email is configured)` : 'Could not send reset email', res.ok ? 'success' : 'error');
   };
 
   return (
@@ -90,6 +105,12 @@ export default function AdminCustomersPage() {
           onKeyDown={e => e.key === 'Enter' && fetchCustomers()}
         />
         <button onClick={fetchCustomers} className="btn btn-sm btn-dark">SEARCH</button>
+        <div style={{ display: 'flex', gap: '0.4rem', marginLeft: 'auto' }}>
+          {(['customer', 'admin'] as const).map(r => (
+            <button key={r} onClick={() => setRoleView(r)} className="btn btn-sm" style={{ border: '2px solid #000', background: roleView === r ? 'var(--accent-yellow)' : '#FFF' }}>{r === 'customer' ? 'CUSTOMERS' : 'ADMINS'}</button>
+          ))}
+          <button className="btn btn-sm" style={{ border: '2px solid #000' }} onClick={async () => { if (!(await downloadExport('customers', token))) showToast('Export failed', 'error'); }}>EXPORT CSV</button>
+        </div>
       </div>
 
       {loading ? (
@@ -139,6 +160,9 @@ export default function AdminCustomersPage() {
                       </span>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button onClick={() => handleReset(c.email)} className="btn btn-sm" style={{ padding: '0.35rem 0.65rem', fontSize: '0.7rem', border: '2px solid #000' }}>RESET PW</button>
+                      <button onClick={() => handleRole(c.id, c.name, roleView === 'customer' ? 'admin' : 'customer')} className="btn btn-sm" style={{ padding: '0.35rem 0.65rem', fontSize: '0.7rem', border: '2px solid #000' }}>{roleView === 'customer' ? 'MAKE ADMIN' : 'REMOVE ADMIN'}</button>
                       <button
                         onClick={() => handleToggleStatus(c.id, c.is_active)}
                         className={`btn btn-sm ${c.is_active === 1 ? 'btn-danger' : 'btn-success'}`}
@@ -146,6 +170,7 @@ export default function AdminCustomersPage() {
                       >
                         {c.is_active === 1 ? 'SUSPEND' : 'ACTIVATE'}
                       </button>
+                      </div>
                     </td>
                   </tr>
                 );

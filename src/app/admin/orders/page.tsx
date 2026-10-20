@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
+import { downloadExport } from '@/lib/admin-client';
 
 interface Order {
   id: string;
@@ -29,6 +30,7 @@ export default function AdminOrdersPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      params.set('limit', '200');
       if (statusFilter) params.set('status', statusFilter);
       const res = await fetch(`/api/orders?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -68,7 +70,7 @@ export default function AdminOrdersPage() {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
         showToast(`Order status updated to ${newStatus.toUpperCase()}`);
       } else {
-        showToast('Failed to update order status', 'error');
+        showToast((await res.json().catch(() => ({}))).error || 'Failed to update order status', 'error');
       }
     } catch {
       showToast('Error updating order status', 'error');
@@ -89,6 +91,7 @@ export default function AdminOrdersPage() {
             Track sales transactions, payment status, and update order fulfillment stages.
           </p>
         </div>
+        <button className="btn btn-lg" style={{ boxShadow: '4px 4px 0px #000' }} onClick={async () => { if (!(await downloadExport('orders', token))) showToast('Export failed', 'error'); }}>EXPORT CSV</button>
       </div>
 
       {/* Toolbar & Filter Tabs */}
@@ -102,7 +105,7 @@ export default function AdminOrdersPage() {
         />
 
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          {['', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].map(st => (
+          {['', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'].map(st => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
@@ -163,10 +166,12 @@ export default function AdminOrdersPage() {
                       style={{ padding: '0.35rem 1.75rem 0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 800, width: 'auto', boxShadow: 'none', border: '2px solid #000', background: o.status === 'delivered' ? '#E8F5E9' : o.status === 'shipped' ? '#E3F2FD' : '#FFFDE7' }}
                     >
                       <option value="pending">PENDING</option>
+                      <option value="confirmed">CONFIRMED</option>
                       <option value="processing">PROCESSING</option>
                       <option value="shipped">SHIPPED</option>
                       <option value="delivered">DELIVERED</option>
                       <option value="cancelled">CANCELLED</option>
+                      <option value="refunded">REFUNDED</option>
                     </select>
                   </td>
                   <td style={{ padding: '1rem', textAlign: 'center' }}>

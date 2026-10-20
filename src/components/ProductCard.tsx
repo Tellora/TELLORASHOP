@@ -1,8 +1,9 @@
 'use client';
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/components/Toast';
+import { useWishlist } from '@/context/WishlistContext';
 
 interface ProductCardProps {
   product: {
@@ -48,7 +49,9 @@ const categoryGradients: Record<string, string> = {
 export default function ProductCard({ product }: ProductCardProps) {
   const { addItem } = useCart();
   const { showToast } = useToast();
-  const [isWished, setIsWished] = useState(false);
+  const { has, toggle } = useWishlist();
+  const isWished = has(product.id);
+  const soldOut = product.quantity !== undefined && product.quantity <= 0;
 
   const getProductImage = () => {
     try {
@@ -75,6 +78,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (soldOut) return;
     addItem({
       product_id: product.id,
       name: product.name,
@@ -86,11 +90,14 @@ export default function ProductCard({ product }: ProductCardProps) {
     showToast(`Added ${product.name} to cart!`);
   };
 
-  const toggleWishlist = (e: React.MouseEvent) => {
+  const toggleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsWished(!isWished);
-    showToast(isWished ? `Removed from wishlist` : `Added to wishlist!`);
+    const result = await toggle(product.id);
+    if (result === 'login') showToast('Log in to save items to your wishlist', 'info');
+    else if (result === 'added') showToast('Added to wishlist!');
+    else if (result === 'removed') showToast('Removed from wishlist');
+    else showToast('Could not update wishlist', 'error');
   };
 
   return (
@@ -126,6 +133,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         <div className="product-card-badges" style={{ position: 'absolute', top: '0.85rem', left: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', zIndex: 10 }}>
           {product.is_featured ? <span className="badge badge-yellow">Featured</span> : null}
           {discount > 0 && <span className="badge badge-red">-{discount}%</span>}
+          {soldOut && <span className="badge badge-red">Sold Out</span>}
           {product.quantity !== undefined && product.quantity <= 5 && product.quantity > 0 && (
             <span className="badge badge-orange">Low Stock</span>
           )}
@@ -190,11 +198,12 @@ export default function ProductCard({ product }: ProductCardProps) {
         <button
           onClick={handleAddToCart}
           className="btn btn-sm btn-primary"
+          disabled={soldOut}
           style={{ padding: '0.4rem 0.75rem', borderRadius: '6px', border: '2px solid #000', boxShadow: '2px 2px 0px #000', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
           title="Add to Cart"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-          ADD
+          {soldOut ? 'SOLD OUT' : 'ADD'}
         </button>
       </div>
     </Link>

@@ -5,50 +5,77 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
 
-const adminNavSections = [
+type NavLink = { href: string; label: string; icon: string; count?: string };
+
+// `count` names a key from /api/admin/counts; the badge only shows when the number is above zero
+const adminNavSections: Array<{ title: string; links: NavLink[] }> = [
   {
     title: 'MAIN OVERVIEW',
-    links: [
-      { href: '/admin', label: 'Dashboard', icon: 'DSH', badge: null },
-    ],
+    links: [{ href: '/admin', label: 'Dashboard', icon: 'DSH' }],
   },
   {
     title: 'CATALOG MANAGEMENT',
     links: [
-      { href: '/admin/products', label: 'Products', icon: 'PRD', badge: '12' },
-      { href: '/admin/categories', label: 'Categories', icon: 'CAT', badge: '6' },
+      { href: '/admin/products', label: 'Products', icon: 'PRD', count: 'low_stock' },
+      { href: '/admin/categories', label: 'Categories', icon: 'CAT' },
     ],
   },
   {
     title: 'SALES & ORDERS',
     links: [
-      { href: '/admin/orders', label: 'Orders', icon: 'ORD', badge: 'NEW' },
-      { href: '/admin/customers', label: 'Customers', icon: 'USR', badge: null },
+      { href: '/admin/orders', label: 'Orders', icon: 'ORD', count: 'orders_new' },
+      { href: '/admin/customers', label: 'Customers', icon: 'USR' },
     ],
   },
   {
     title: 'MARKETING & PROMO',
     links: [
-      { href: '/admin/coupons', label: 'Discounts', icon: 'DSC', badge: '3' },
-      { href: '/admin/reviews', label: 'Reviews', icon: 'REV', badge: '4' },
+      { href: '/admin/coupons', label: 'Discounts', icon: 'DSC' },
+      { href: '/admin/banners', label: 'Banners', icon: 'BNR' },
+      { href: '/admin/newsletter', label: 'Newsletter', icon: 'NWS' },
+      { href: '/admin/reviews', label: 'Reviews', icon: 'REV', count: 'reviews_pending' },
     ],
   },
   {
-    title: 'SYSTEM & CONTENT',
+    title: 'SUPPORT & CONTENT',
     links: [
-      { href: '/admin/pages', label: 'Pages (CMS)', icon: 'CMS', badge: null },
-      { href: '/admin/settings', label: 'Store Settings', icon: 'SET', badge: null },
+      { href: '/admin/messages', label: 'Messages', icon: 'MSG', count: 'messages_new' },
+      { href: '/admin/faqs', label: 'FAQs', icon: 'FAQ' },
+      { href: '/admin/pages', label: 'Pages (CMS)', icon: 'CMS' },
     ],
+  },
+  {
+    title: 'SYSTEM',
+    links: [{ href: '/admin/settings', label: 'Store Settings', icon: 'SET' }],
   },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading, logout } = useAuth();
+  const { user, token, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { showToast } = useToast();
   const [authorized, setAuthorized] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [insecurePassword, setInsecurePassword] = useState(false);
+
+  // Live sidebar numbers, refreshed on every page change
+  useEffect(() => {
+    if (!authorized || !token) return;
+    fetch('/api/admin/counts', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) setCounts(d); })
+      .catch(() => {});
+  }, [authorized, token, pathname]);
+
+  useEffect(() => {
+    if (!authorized || !token) return;
+    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) setInsecurePassword(Boolean(d.insecure_default_password)); })
+      .catch(() => {});
+  }, [authorized, token]);
 
   useEffect(() => {
     if (!loading) {
@@ -171,9 +198,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </span>
                         <span>{link.label}</span>
                       </div>
-                      {link.badge && (
+                      {link.count && counts[link.count] > 0 && (
                         <span className={`badge ${isActive ? 'badge-dark' : 'badge-pink'}`} style={{ transform: 'none', fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
-                          {link.badge}
+                          {counts[link.count]}
                         </span>
                       )}
                     </Link>
@@ -186,6 +213,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Content Panel */}
         <main className="admin-content" style={{ flex: 1, padding: '2rem 2.5rem', background: '#FFFDF9', overflowX: 'auto' }}>
+          {insecurePassword && (
+            <div role="alert" style={{ background: 'var(--accent-red)', color: '#FFF', border: '3px solid #000', boxShadow: '4px 4px 0px #000', padding: '0.85rem 1.25rem', marginBottom: '1.5rem', fontWeight: 800 }}>
+              SECURITY: this admin account still uses the default password (admin123). Change it now from <Link href="/account" style={{ textDecoration: 'underline' }}>My Account → Security</Link> before going live.
+            </div>
+          )}
           {children}
         </main>
       </div>

@@ -79,3 +79,16 @@ Log in to the DNS provider where `telloramediahq.com` is managed (e.g., Cloudfla
 The repository includes `.github/workflows/deploy.yml`. Every time you push changes to `main`:
 - GitHub Actions automatically runs linter and verifies the Next.js build.
 - You can optionally set GitHub Repository Secrets (`VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`) to trigger automatic production deployments on every push.
+
+
+---
+
+## Going live checklist
+
+1. **Environment variables**: copy `.env.example`, fill it in and set the values in your host. `JWT_SECRET` is required in production.
+2. **Change the admin password**: log in as the seeded admin, open My Account > Security and set a new password. The admin panel warns you until you do.
+3. **Remove demo data**: the seeded demo customer, sample orders and sample products are fake. Delete them in the admin panel (or start from a fresh database).
+4. **Store Settings**: open Admin > Store Settings and fill in your store details, shipping, tax and payment methods. The "Launch readiness" box shows what is still missing.
+5. **Legal pages**: review and edit Privacy Policy, Terms of Service and the other pages in Admin > Pages. The defaults are templates.
+6. **Database persistence**: the app stores everything in `tellorashop.db` (SQLite). It must live on a disk that persists between deploys (a VPS or a Docker volume). Serverless hosts such as Vercel have a read-only, temporary file system and will lose data.
+7. **Back up** `tellorashop.db` regularly.

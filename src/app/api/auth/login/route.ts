@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { compareSync } from 'bcryptjs';
 import { createToken } from '@/lib/auth';
+import { rateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
+  const limited = rateLimit(request, 'login', 10, 15 * 60 * 1000);
+  if (limited) return limited;
   try {
     const body = await request.json();
     const { email, password } = body;
@@ -13,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getDb();
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase()) as {
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(String(email).trim().toLowerCase()) as {
       id: string; email: string; password_hash: string; name: string; role: string; is_active: number;
     } | undefined;
 
